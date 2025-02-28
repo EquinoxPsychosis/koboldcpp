@@ -1708,7 +1708,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, &candidates_p);
                     break;
                 case KCPP_SAMPLER_PRES_PEN:
-                    sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty)
+                    sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
                     break;
                 default:
                     printf("\nSampleLogits: Unknown Sampler : %d",sampler_order[i]);
