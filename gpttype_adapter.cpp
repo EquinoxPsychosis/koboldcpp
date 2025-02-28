@@ -1637,7 +1637,7 @@ void sample_grammar(FileFormat file_format, int32_t n_vocab, llama_token_data_ar
 
 }
 
-std::unordered_set<llama token> mask_nsigma(llama_token_data_array * cur_p, float nsigma) {
+std::unordered_set<llama_token> mask_nsigma(llama_token_data_array * cur_p, float nsigma) {
 
     std::unordered_set<llama_token> nsigma_mask;
 
@@ -1673,12 +1673,12 @@ std::unordered_set<llama token> mask_nsigma(llama_token_data_array * cur_p, floa
 }
 
 int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float occurrence_penalty, float top_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
-int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability,
+int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability, float xtc_nsigma,
 const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dynatemp_range, float dynatemp_exponent, float smoothing_factor)
 {
     int id = 0;
 
-    std::unordered_set<llama_token> xtc_nsigma_mask
+    std::unordered_set<llama_token> xtc_nsigma_mask;
 
     std::vector<llama_token_data> candidates;
     candidates.reserve(n_vocab);
@@ -1734,10 +1734,70 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
         } else {
             sample_temperature(&candidates_p, temp);
         }
+
+        xtc_nsigma_mask = mask_nsigma(&candidates_p, xtc_nsigma);
+        sample_top_n_sigma(&candidates_p, nsigma);
+
         sample_smooth(&candidates_p, smoothing_factor);
 
-        sample_top_n_sigma(&candidates_p, nsigma);
-        sample_xtc(&candidates_p, xtc_threshold, xtc_probability, rng);
+        sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        id = sample_token(&candidates_p, rng);
+    }
+    else if (xtc_nsigma > 0.0f)
+    {
+        sample_top_k(&candidates_p, top_k);
+        if (dynatemp_range != 0) {
+            float dynatemp_min = temp - dynatemp_range;
+            float dynatemp_max = temp + dynatemp_range;
+            //do not allow negative values
+            dynatemp_min       = dynatemp_min < 0 ? 0 : dynatemp_min;
+            dynatemp_max       = dynatemp_max < 0 ? 0 : dynatemp_max;
+            dynatemp_exponent  = dynatemp_exponent < 0 ? 0 : dynatemp_exponent;
+            sample_entropy(&candidates_p, dynatemp_min, dynatemp_max, dynatemp_exponent);
+        } else {
+            sample_temperature(&candidates_p, temp);
+        }
+
+        xtc_nsigma_mask = mask_nsigma(&candidates_p, xtc_nsigma);
+
+        for (int i = 0; i < sampler_order.size(); i++) {
+            switch (sampler_order[i]) {
+                case KCPP_SAMPLER_TOP_K:
+                    break;
+                case KCPP_SAMPLER_TOP_A:
+                    sample_top_a(&candidates_p, top_a, 1);
+                    break;
+                case KCPP_SAMPLER_TOP_P:
+                    sample_top_p(&candidates_p, top_p, 1);
+                    sample_min_p(&candidates_p, min_p, 1);
+                    break;
+                case KCPP_SAMPLER_TFS:
+                    sample_tail_free(&candidates_p, tfs, 1);
+                    break;
+                case KCPP_SAMPLER_TYP:
+                    sampler_typical(&candidates_p, typical_p, 1);
+                    break;
+                case KCPP_SAMPLER_TEMP:
+                    break;
+                case KCPP_SAMPLER_SMOOTH:
+                    sample_smooth(&candidates_p, smoothing_factor);
+                    break;
+                case KCPP_SAMPLER_REP_PEN:
+                    sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, &candidates_p);
+                    break;
+                case KCPP_SAMPLER_PRES_PEN:
+                    sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
+                    break;
+                case KCPP_SAMPLER_OCCR_PEN:
+                    sample_occr_pen(&candidates_p, n_ctx, rep_pen_range, occurrence_penalty);
+                    break;
+                default:
+                    printf("\nSampleLogits: Unknown Sampler : %d", sampler_order[i]);
+                    break;
+            }
+        }
+        //xtc always last
+        sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
         id = sample_token(&candidates_p, rng);
     }
     else
@@ -1792,7 +1852,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
             }
         }
         //xtc always last
-        sample_xtc(&candidates_p, xtc_threshold, xtc_probability, rng);
+        sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
         id = sample_token(&candidates_p, rng);
     }
 
@@ -3155,6 +3215,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     kcpp_data->dry_penalty_last_n = inputs.dry_penalty_last_n;
     kcpp_data->xtc_threshold = inputs.xtc_threshold;
     kcpp_data->xtc_probability = inputs.xtc_probability;
+    kcpp_data->xtc_nsigma = inputs.xtc_nsigma;
     kcpp_data->dynatemp_range = inputs.dynatemp_range;
     kcpp_data->dynatemp_exponent = inputs.dynatemp_exponent;
     kcpp_data->n_ctx = inputs.max_context_length;
@@ -3771,7 +3832,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                 top_k, top_a, top_p, min_p, typical_p, tfs_z, nsigma, temp, rng,
                 kcpp_data->mirostat, kcpp_data->mirostat_tau, kcpp_data->mirostat_eta,
                 kcpp_data->dry_multiplier, kcpp_data->dry_base,
-                kcpp_data->dry_allowed_length, kcpp_data->dry_penalty_last_n, kcpp_data->xtc_threshold, kcpp_data->xtc_probability,
+                kcpp_data->dry_allowed_length, kcpp_data->dry_penalty_last_n, kcpp_data->xtc_threshold, kcpp_data->xtc_probability, kcpp_data->xtc_nsigma,
                 sampler_order, grammar, dynatemp_range, dynatemp_exponent, smoothing_factor);
 
                 if(draft_used)
