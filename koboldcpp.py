@@ -31,7 +31,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 # constants
-sampler_order_max = 7
+sampler_order_max = 32
 tensor_split_max = 16
 images_max = 8
 bias_min_value = -100.0
