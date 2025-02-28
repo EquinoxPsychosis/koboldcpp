@@ -914,33 +914,46 @@ void sample_top_a(llama_token_data_array * candidates, float a, size_t min_keep)
     candidates->size = last_idx;
 }
 
-void sample_xtc(llama_token_data_array * candidates, float xtc_threshold, float xtc_probability, std::mt19937 & rng)
+void sample_xtc(llama_token_data_array * cur_p, float xtc_threshold, float xtc_probability, float xtc_nsigma, std::unordered_set<llama_token> xtc_nsigma_mask, std::mt19937 & rng)
 {
-    if (xtc_threshold > 0.5f || xtc_probability <= 0.0f || candidates->size <= 1) {
+    if (xtc_threshold > 0.5f || xtc_probability <= 0.0f || cur_p->size <= 1 || (xtc_nsigma > 0.0f && xtc_nsigma_mask.size() <= 1)) {
         return;
     }
 
     std::uniform_real_distribution<float> dist(0.0f, 1.0f);
     float roll = dist(rng);
-    if(roll>=xtc_probability) //if dice roll fails, skip xtc
+    if(roll>=xtc_probability) // if dice roll fails, skip xtc
     {
         return;
     }
 
-    sample_softmax(candidates);
+    sample_softmax(cur_p);
 
-    //calculate how many tokens cross the xtc threshold
-    size_t last_idx = candidates->size;
-    for (size_t i = 0; i < candidates->size; ++i) {
-        // Go until we reach a value under the threshold
-        float checkprob = candidates->data[i].p;
-        if (checkprob < xtc_threshold) {
-            last_idx = i;
-            break;
+    // calculate how many tokens cross the xtc threshold
+    size_t last_idx = cur_p->size;
+    for (size_t i = 0; i < cur_p->size; ++i) {
+        if (xtc_nsigma > 0.0f) {
+            // if dynaxtc is enabled use nsigma mask to trim tokens instead
+            if (xtc_nsigma_mask.find(cur_p->data[i].id) == xtc_nsigma_mask.end())
+            { // if token isn't in mask then skip to next token candidate
+                continue;
+            }
+            else
+            {  // otherwise the token is trimmed
+                cur_p->data[i].logit -= 999.0f;
+            }
+
+        } else {
+            // otherwise go until we reach a value under the threshold
+            float checkprob = cur_p->data[i].p;
+            if (checkprob < xtc_threshold) {
+                last_idx = i;
+                break;
+            }
         }
     }
 
-    if(last_idx>1) //if there are 2 or more viable candidates
+    if (last_idx > 1 && xtc_nsigma <= 0.0f)  // check if there are 2 or more viable candidatesif there are 2 or more viable candidates
     {
         if (debugmode==1 && !is_quiet) {
             printf("XTC penalties [");
@@ -949,19 +962,21 @@ void sample_xtc(llama_token_data_array * candidates, float xtc_threshold, float 
         for (size_t i = 0; i < last_idx - 1; ++i) {
             if (debugmode==1 && !is_quiet)
             {
-                gpt_vocab::id token = candidates->data[i].id;
+                gpt_vocab::id token = cur_p->data[i].id;
                 std::string tokenizedstr = FileFormatTokenizeID(token, file_format);
                 ::utreplace(tokenizedstr, "\n", "\\n");
-                printf("%s(%s %.02f%%)", i == 0 ? "" : " ", RemoveBell(tokenizedstr).c_str(), 100.f * candidates->data[i].p);
+                printf("%s(%s %.02f%%)", i == 0 ? "" : " ", RemoveBell(tokenizedstr).c_str(), 100.f * cur_p->data[i].p);
             }
-            candidates->data[i].logit -= 999.0f; //infinity gets wonky results downstream, this hack works well enough
+            cur_p->data[i].logit -= 999.0f; // infinity gets wonky results downstream, this hack works well enough
         }
         if (debugmode==1 && !is_quiet) {
             printf("]\n");
         }
-        candidates->sorted = false;
+    }  // otherwise xtc does not do anything
 
-    }  //otherwise xtc does not do anything
+    if (last_idx > 1 || xtc_nsigma > 0.0f) {
+        cur_p->sorted = false;
+    }
 
     // printf("\n\nCandidates: %d, Threshold: %f, LastIdx: %d",candidates->size,xtc_threshold,last_idx);
     // printf("\nCandidates: %f %f %f %f\n",candidates->data[0].p,candidates->data[1].p,candidates->data[2].p,candidates->data[3].p);
