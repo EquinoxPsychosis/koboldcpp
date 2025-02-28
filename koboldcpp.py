@@ -201,6 +201,7 @@ class generation_inputs(ctypes.Structure):
                 ("rep_pen_range", ctypes.c_int),
                 ("rep_pen_slope", ctypes.c_float),
                 ("presence_penalty", ctypes.c_float),
+                ("occurrence_penalty", ctypes.c_float),
                 ("mirostat", ctypes.c_int),
                 ("mirostat_tau", ctypes.c_float),
                 ("mirostat_eta", ctypes.c_float),
@@ -1124,6 +1125,7 @@ def generate(genparams, stream_flag=False):
     rep_pen_range = int(genparams.get('rep_pen_range', 320))
     rep_pen_slope = float(genparams.get('rep_pen_slope', 1.0))
     presence_penalty = float(genparams.get('presence_penalty', 0.0))
+    occurrence_penalty = float(genparams.get('occurrence_penalty', 0.0))
     mirostat = int(genparams.get('mirostat', 0))
     mirostat_tau = float(genparams.get('mirostat_tau', 5.0))
     mirostat_eta = float(genparams.get('mirostat_eta', 0.1))
@@ -1191,6 +1193,7 @@ def generate(genparams, stream_flag=False):
     inputs.rep_pen_range = rep_pen_range
     inputs.rep_pen_slope = rep_pen_slope
     inputs.presence_penalty = presence_penalty
+    inputs.occurrence_penalty = occurrence_penalty
     inputs.stream_sse = stream_sse
     inputs.dynatemp_range = dynatemp_range
     inputs.dynatemp_exponent = dynatemp_exponent

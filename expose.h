@@ -17,6 +17,7 @@ enum samplers
     KCPP_SAMPLER_SMOOTH=6,
     KCPP_SAMPLER_REP_PEN=7,
     KCPP_SAMPLER_PRES_PEN=8,
+    KCPP_SAMPLER_OCCR_PEN=9,
     KCPP_SAMPLER_MAX
 };
 enum stop_reason
@@ -89,6 +90,7 @@ struct generation_inputs
     const int rep_pen_range = 0;
     const float rep_pen_slope = 1.0f;
     const float presence_penalty = 0.0f;
+    const float occurrence_penalty = 0.0f;
     const int mirostat = 0;
     const float mirostat_eta = 0.0f;
     const float mirostat_tau = 0.0f;

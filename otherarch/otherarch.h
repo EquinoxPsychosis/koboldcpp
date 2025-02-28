@@ -37,6 +37,7 @@ struct kcpp_params {
     int32_t repeat_last_n     = 64;    // last n tokens to penalize (0 = disable penalty, -1 = context size)
     float   rep_pen_slope     = 1.0f;
     float   presence_penalty  = 0.00f; // 0.0 = disabled
+    float   occurrence_penalty= 0.00f; // 0.0 = disabled
     int32_t mirostat          = 0;     // 0 = disabled, 1 = mirostat, 2 = mirostat 2.0
     float   mirostat_tau      = 5.00f; // target entropy
     float   mirostat_eta      = 0.10f; // learning rate
