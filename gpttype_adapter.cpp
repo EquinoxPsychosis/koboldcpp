@@ -1245,6 +1245,39 @@ void sample_pres_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_rang
     cur_p->sorted = false;
 }
 
+void sample_occr_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_range, float occurrence_penalty) {
+    auto last_n_repeat = std::min(std::min((int) last_n_tokens.size(), rep_pen_range), n_ctx);
+
+    const llama_token * last_tokens =  last_n_tokens.data() + last_n_tokens.size() - last_n_repeat;
+    size_t last_tokens_size = last_n_repeat;
+
+    if (last_tokens_size <= 0 || occurrence_penalty <= 0) {
+        return;
+    }
+
+    const int64_t t_start_sample_us = ggml_time_us();
+
+    // create a penalty map of token occurrences within penalty range
+    std::unordered_map<llama_token, int> penalty_map;
+    for (size_t i = 0; i < last_n_repeat; ++i) {
+        penalty_map[last_tokens[i]]++;
+    }
+
+    for (size_t i = 0; i < cur_p->size; ++i) {
+        const bool token_in_map = penalty_map.find(cur_p->data[i].id) != penalty_map.end();
+        if (!token_in_map) {
+            continue;
+        }
+
+        size_t token_tally = static_cast<size_t>(penalty_map.at(cur_p->data[i].id));
+        for (size_t j = 0; j < token_tally; j++) {
+            cur_p->data[i].logit -= occurrence_penalty;
+        }
+    }
+
+    cur_p->sorted = false;
+}
+
 void sample_top_p(llama_token_data_array * cur_p, float p, size_t min_keep) {
     if (p >= 1.0f) {
         return;
