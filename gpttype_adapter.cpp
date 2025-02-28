@@ -11,6 +11,7 @@
 #include <time.h>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include "model_adapter.h"
 #include "otherarch.h"
 #include "llama.h"
@@ -1173,7 +1174,7 @@ void sample_dry(int n_ctx, int penalty_range, float penalty_multiplier, float pe
     }
 }
 
-void sample_rep_pen(int n_ctx, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, llama_token_data_array * candidates_p)
+void sample_rep_pen(int n_ctx, int rep_pen_range, float rep_pen, float rep_pen_slope, llama_token_data_array * candidates_p)
 {
     auto last_n_repeat = std::min(std::min((int)last_n_tokens.size(), rep_pen_range), n_ctx);
 
@@ -1181,7 +1182,7 @@ void sample_rep_pen(int n_ctx, int rep_pen_range, float rep_pen, float rep_pen_s
     size_t last_tokens_size = last_n_repeat;
     llama_token_data_array * candidates = candidates_p;
 
-    if (last_tokens_size == 0 || (rep_pen == 1.0f && presence_penalty==0)) {
+    if (last_tokens_size <= 0 || rep_pen <= 1.0f) {
         return;
     }
 
@@ -1224,12 +1225,36 @@ void sample_rep_pen(int n_ctx, int rep_pen_range, float rep_pen, float rep_pen_s
         } else {
             candidates->data[i].logit /= penalty;
         }
-
-        candidates->data[i].logit -= presence_penalty;
     }
 
     candidates->sorted = false;
+}
 
+void sample_pres_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_range, float presence_penalty) {
+    auto last_n_repeat = std::min(std::min((int) last_n_tokens.size(), rep_pen_range), n_ctx);
+
+    const llama_token * last_tokens =  last_n_tokens.data() + last_n_tokens.size() - last_n_repeat;
+    size_t last_tokens_size = last_n_repeat;
+
+    if (last_tokens_size <= 0 || presence_penalty <= 0) {
+        return;
+    }
+
+    const int64_t t_start_sample_us = ggml_time_us();
+
+    // create a penalty mask of the tokens within penalty range
+    std::unordered_set<llama_token> penalty_mask(last_tokens, last_tokens + last_n_repeat);
+
+    for (size_t i = 0; i < cur_p->size; ++i) {
+        const bool token_in_mask = penalty_mask.find(cur_p->data[i].id) != penalty_mask.end();
+        if (!token_in_mask) {
+            continue;
+        }
+
+        cur_p->data[i].logit -= presence_penalty;
+    }
+
+    cur_p->sorted = false;
 }
 
 void sample_top_p(llama_token_data_array * cur_p, float p, size_t min_keep) {
@@ -1692,7 +1717,10 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_smooth(&candidates_p, smoothing_factor);
                     break;
                 case KCPP_SAMPLER_REP_PEN:
-                    sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, presence_penalty, &candidates_p);
+                    sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, &candidates_p);
+                    break;
+                case KCPP_SAMPLER_PRES_PEN:
+                    sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty)
                     break;
                 default:
                     printf("\nSampleLogits: Unknown Sampler : %d",sampler_order[i]);
