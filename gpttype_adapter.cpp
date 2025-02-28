@@ -1622,11 +1622,49 @@ void sample_grammar(FileFormat file_format, int32_t n_vocab, llama_token_data_ar
 
 }
 
+std::unordered_set<llama token> mask_nsigma(llama_token_data_array * cur_p, float nsigma) {
+
+    std::unordered_set<llama_token> nsigma_mask;
+
+    if (nsigma <= 0.0f || cur_p->size <= 1) {
+        return nsigma_mask;
+    }
+    // find max logit and calculate mean
+    float nsigmax = cur_p->data[0].logit;
+    float logits_sum = 0;
+    for (size_t i = 0; i < cur_p->size; ++i) {
+        if (cur_p->data[i].logit > nsigmax) {
+            nsigmax = cur_p->data[i].logit;
+        }
+        logits_sum += cur_p->data[i].logit;
+    }
+    float nsigmean = logits_sum / cur_p->size;
+
+    // calculate standard deviation
+    float nsigacc = 0;
+    for (size_t i = 0; i < cur_p->size; ++i) {
+        nsigacc += pow(cur_p->data[i].logit - nsigmean, 2);
+    }
+    float nsigstd = sqrt(nsigacc / cur_p->size);
+
+    // create mask
+    for (size_t i = 0; i < cur_p->size; ++i) {
+        if (cur_p->data[i].logit < nsigmax - (nsigma * nsigstd)) {
+            nsigma_mask.insert(cur_p->data[i].id)
+        }
+    }
+
+    return nsigma_mask;
+}
+
 int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float occurrence_penalty, float top_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
 int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability,
 const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dynatemp_range, float dynatemp_exponent, float smoothing_factor)
 {
     int id = 0;
+
+    std::unordered_set<llama_token> xtc_nsigma_mask
+
     std::vector<llama_token_data> candidates;
     candidates.reserve(n_vocab);
     for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
