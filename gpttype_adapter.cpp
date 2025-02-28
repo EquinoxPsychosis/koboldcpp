@@ -1672,7 +1672,7 @@ std::unordered_set<llama_token> mask_nsigma(llama_token_data_array * cur_p, floa
     return nsigma_mask;
 }
 
-int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float occurrence_penalty, float top_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
+int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float occurrence_penalty, float top_k, float performance_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
 int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability, float xtc_nsigma,
 const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dynatemp_range, float dynatemp_exponent, float smoothing_factor)
 {
@@ -1702,7 +1702,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
     sample_dry(n_ctx, dry_penalty_last_n, dry_multiplier, dry_base, dry_allowed_length, dry_sequence_breakers, &candidates_p);
 
     //prefilter to top 3k tokens for improved speed
-    sample_top_k(&candidates_p, 3000);
+    sample_top_k(&candidates_p, performance_k);
 
     if (mirostat == 1 || mirostat == 2)
     {
@@ -3195,6 +3195,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     kcpp_data->seed = inputs.seed;
     kcpp_data->n_predict = inputs.max_length;
     kcpp_data->top_k = inputs.top_k;
+    kcpp_data->performance_k = inputs.performance_k;
     kcpp_data->top_p = inputs.top_p;
     kcpp_data->min_p = inputs.min_p;
     kcpp_data->typical_p = inputs.typical_p;
@@ -3305,6 +3306,10 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     if (kcpp_data->top_k < 1)
     {
         kcpp_data->top_k = n_vocab; // all tokens in the vocabulary should be considered if top k is disabled
+    }
+    if (kcpp_data->performance_k < 1)
+    {
+        kcpp_data->performance_k = n_vocab;
     }
     if (kcpp_data->seed <= 0 || kcpp_data->seed==0xFFFFFFFF)
     {
@@ -3516,12 +3521,15 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     {
         sampler_order = {
             KCPP_SAMPLER_REP_PEN,
+            KCPP_SAMPLER_PRES_PEN,
+            KCPP_SAMPLER_OCCR_PEN,
             KCPP_SAMPLER_TOP_K,
             KCPP_SAMPLER_TOP_A,
             KCPP_SAMPLER_TFS,
             KCPP_SAMPLER_TYP,
             KCPP_SAMPLER_TOP_P,
-            KCPP_SAMPLER_TEMP
+            KCPP_SAMPLER_TEMP,
+            KCPP_SAMPLER_SMOOTH
         };
     }
     else
@@ -3724,6 +3732,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
         {
             // out of user input, sample next token
             const float top_k = kcpp_data->top_k;
+            const float performance_k = kcpp_data->performance_k;
             const float top_p = kcpp_data->top_p;
             const float min_p = kcpp_data->min_p;
             const float temp = kcpp_data->temp;
@@ -3829,7 +3838,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                 }
 
                 id = SampleLogits(logitsPtr, nctx, n_vocab, last_n_size, repeat_penalty, kcpp_data->rep_pen_slope, presence_penalty, occurrence_penalty,
-                top_k, top_a, top_p, min_p, typical_p, tfs_z, nsigma, temp, rng,
+                top_k, performance_k, top_a, top_p, min_p, typical_p, tfs_z, nsigma, temp, rng,
                 kcpp_data->mirostat, kcpp_data->mirostat_tau, kcpp_data->mirostat_eta,
                 kcpp_data->dry_multiplier, kcpp_data->dry_base,
                 kcpp_data->dry_allowed_length, kcpp_data->dry_penalty_last_n, kcpp_data->xtc_threshold, kcpp_data->xtc_probability, kcpp_data->xtc_nsigma,

@@ -191,6 +191,7 @@ class generation_inputs(ctypes.Structure):
                 ("max_length", ctypes.c_int),
                 ("temperature", ctypes.c_float),
                 ("top_k", ctypes.c_int),
+                ("performance_k", ctypes.c_int),
                 ("top_a", ctypes.c_float),
                 ("top_p", ctypes.c_float),
                 ("min_p", ctypes.c_float),
@@ -1116,6 +1117,7 @@ def generate(genparams, stream_flag=False):
     max_length = int(genparams.get('max_length', 200))
     temperature = float(genparams.get('temperature', 0.75))
     top_k = int(genparams.get('top_k', 100))
+    performance_k = int(genparams.get('performance_k', 3000))
     top_a = float(genparams.get('top_a', 0.0))
     top_p = float(genparams.get('top_p', 0.92))
     min_p = float(genparams.get('min_p', 0.0))
@@ -1138,7 +1140,7 @@ def generate(genparams, stream_flag=False):
     xtc_threshold = float(genparams.get('xtc_threshold', 0.2))
     xtc_probability = float(genparams.get('xtc_probability', 0))
     xtc_nsigma = float(genparams.get('xtc_nsigma', 0))
-    sampler_order = genparams.get('sampler_order', [6, 0, 1, 3, 4, 2, 5])
+    sampler_order = genparams.get('sampler_order', [7, 8, 9, 0, 1, 3, 4, 2, 5, 6])
     seed = tryparseint(genparams.get('sampler_seed', -1))
     stop_sequence = genparams.get('stop_sequence', [])
     ban_eos_token = genparams.get('ban_eos_token', False)
@@ -1185,6 +1187,7 @@ def generate(genparams, stream_flag=False):
     inputs.max_length = max_length
     inputs.temperature = temperature
     inputs.top_k = top_k
+    inputs.performance_k = performance_k
     inputs.top_a = top_a
     inputs.top_p = top_p
     inputs.min_p = min_p

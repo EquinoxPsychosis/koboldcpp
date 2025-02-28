@@ -80,6 +80,7 @@ struct generation_inputs
     const int max_length = 0;
     const float temperature = 0.0f;
     const int top_k = 0;
+    const int performance_k = 0;
     const float top_a = 0.0f;
     const float top_p = 0.0f;
     const float min_p = 0.0f;

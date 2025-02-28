@@ -26,8 +26,9 @@ struct kcpp_params {
 
     // sampling parameters
     int32_t top_k             = 40;    // <= 0 to use vocab size
+    int32_t performance_k     = 3000;  // higher = performance / lower = speed / 0 = max performance
     float   top_p             = 0.95f; // 1.0 = disabled
-    float   min_p             = 0.0f; // 0.0 = disabled
+    float   min_p             = 0.0f;  // 0.0 = disabled
     float   tfs_z             = 1.00f; // 1.0 = disabled
     float   nsigma            = 0.00f; // 0.0 - disabled
     float   typical_p         = 1.00f; // 1.0 = disabled
