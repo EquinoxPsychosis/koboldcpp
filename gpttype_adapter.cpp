@@ -1667,8 +1667,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
     {
         for (int i = 0; i < sampler_order.size(); i++)
         {
-            switch (sampler_order[i])
-            {
+            switch (sampler_order[i]) {
                 case KCPP_SAMPLER_TOP_K:
                     sample_top_k(&candidates_p, top_k);
                     break;
@@ -1686,18 +1685,15 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sampler_typical(&candidates_p, typical_p, 1);
                     break;
                 case KCPP_SAMPLER_TEMP:
-                    if (dynatemp_range!=0)
-                    {
+                    if (dynatemp_range != 0) {
                         float dynatemp_min = temp - dynatemp_range;
                         float dynatemp_max = temp + dynatemp_range;
                         //do not allow negative values
-                        dynatemp_min = dynatemp_min<0?0:dynatemp_min;
-                        dynatemp_max = dynatemp_max<0?0:dynatemp_max;
-                        dynatemp_exponent = dynatemp_exponent<0?0:dynatemp_exponent;
+                        dynatemp_min       = dynatemp_min < 0 ? 0 : dynatemp_min;
+                        dynatemp_max       = dynatemp_max < 0 ? 0 : dynatemp_max;
+                        dynatemp_exponent  = dynatemp_exponent < 0 ? 0 : dynatemp_exponent;
                         sample_entropy(&candidates_p, dynatemp_min, dynatemp_max, dynatemp_exponent);
-                    }
-                    else
-                    {
+                    } else {
                         sample_temperature(&candidates_p, temp);
                     }
                     break;
@@ -1709,6 +1705,8 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     break;
                 case KCPP_SAMPLER_PRES_PEN:
                     sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
+                    break;
+                case KCPP_SAMPLER_OCCR_PEN:
                     break;
                 default:
                     printf("\nSampleLogits: Unknown Sampler : %d",sampler_order[i]);
