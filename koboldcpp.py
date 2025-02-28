@@ -43,10 +43,10 @@ default_visionmaxres = 1024
 net_save_slots = 8
 
 # abuse prevention
-stop_token_max = 256
-ban_token_max = 512
-logit_bias_max = 512
-dry_seq_break_max = 128
+stop_token_max = 1024
+ban_token_max = 2048
+logit_bias_max = 2048
+dry_seq_break_max = 512
 
 # global vars
 KcppVersion = "1.85"
