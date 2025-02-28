@@ -1188,19 +1188,9 @@ void sample_rep_pen(int n_ctx, int rep_pen_range, float rep_pen, float rep_pen_s
 
     const int64_t t_start_sample_us = ggml_time_us();
 
-    // Create a frequency map to count occurrences of each token in last_tokens
-    std::unordered_map<llama_token, int> token_count_near;
-    std::unordered_map<llama_token, int> token_count_far;
-    for (size_t i = 0; i < last_n_repeat; ++i) {
-        if((i*2) >= last_n_repeat)
-        {
-            token_count_near[last_tokens[i]]++;
-        }
-        else
-        {
-            token_count_far[last_tokens[i]]++;
-        }
-    }
+    // Create a near and far penalty mask of tokens in last_tokens
+    std::unordered_set<llama_token> tokens_near(last_tokens, last_tokens + last_n_repeat / 2);
+    std::unordered_set<llama_token> tokens_far(last_tokens + last_n_repeat / 2, last_tokens + last_n_repeat);
 
     float rep_pen_reduced = rep_pen;
     if(rep_pen_reduced>1.0f)
@@ -1208,15 +1198,13 @@ void sample_rep_pen(int n_ctx, int rep_pen_range, float rep_pen, float rep_pen_s
        rep_pen_reduced = 1.0f + ((rep_pen-1.0f)*rep_pen_slope);
     }
     for (size_t i = 0; i < candidates->size; ++i) {
-        const auto token_in_near = token_count_near.find(candidates->data[i].id);
-        const auto token_in_far = token_count_far.find(candidates->data[i].id);
-        bool in_near = (token_in_near != token_count_near.end());
-        bool in_far = (token_in_far != token_count_far.end());
-        if (!in_near && !in_far) {
+        const bool token_in_near = tokens_near.find(candidates->data[i].id) != tokens_near.end();
+        const bool token_in_far = tokens_far.find(candidates->data[i].id) != tokens_far.end();
+        if (!token_in_near && !token_in_far) {
             continue;
         }
 
-        float penalty = (in_near?rep_pen:rep_pen_reduced);
+        float penalty = (token_in_near?rep_pen:rep_pen_reduced);
 
         // The academic publication that described this technique actually just only divided, but that would cause tokens with negative logits to become more likely, which is obviously wrong.
         // This is common fix for this problem, which is to multiply by the penalty instead of dividing.
