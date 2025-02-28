@@ -1631,7 +1631,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
     {
         static float mirostat_mu = 2.0f * mirostat_tau;
         const int mirostat_m = 100;
-        sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, presence_penalty, &candidates_p);
+        sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, &candidates_p);
         sample_temperature(&candidates_p, temp);
         sample_smooth(&candidates_p, smoothing_factor);
         if (mirostat == 1)
