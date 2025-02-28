@@ -1665,7 +1665,7 @@ std::unordered_set<llama_token> mask_nsigma(llama_token_data_array * cur_p, floa
     // create mask
     for (size_t i = 0; i < cur_p->size; ++i) {
         if (cur_p->data[i].logit < nsigmax - (nsigma * nsigstd)) {
-            nsigma_mask.insert(cur_p->data[i].id)
+            nsigma_mask.insert(cur_p->data[i].id);
         }
     }
 
