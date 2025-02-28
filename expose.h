@@ -90,6 +90,7 @@ struct generation_inputs
     const int rep_pen_range = 0;
     const float rep_pen_slope = 1.0f;
     const float presence_penalty = 0.0f;
+    const float occurrence_penalty = 0.0f;
     const int mirostat = 0;
     const float mirostat_eta = 0.0f;
     const float mirostat_tau = 0.0f;

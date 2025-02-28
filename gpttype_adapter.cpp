@@ -1631,7 +1631,7 @@ void sample_grammar(FileFormat file_format, int32_t n_vocab, llama_token_data_ar
 
 }
 
-int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float top_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
+int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float occurrence_penalty, float top_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
 int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability,
 const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dynatemp_range, float dynatemp_exponent, float smoothing_factor)
 {
@@ -3100,6 +3100,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     kcpp_data->rep_pen_slope = inputs.rep_pen_slope;
     kcpp_data->repeat_penalty = inputs.rep_pen;
     kcpp_data->presence_penalty = inputs.presence_penalty;
+    kcpp_data->occurrence_penalty = inputs.occurrence_penalty;
     kcpp_data->mirostat = inputs.mirostat;
     kcpp_data->mirostat_eta = inputs.mirostat_eta;
     kcpp_data->mirostat_tau = inputs.mirostat_tau;
@@ -3623,6 +3624,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
             const float top_a = inputs.top_a;
             const float repeat_penalty = kcpp_data->repeat_penalty;
             const float presence_penalty = kcpp_data->presence_penalty;
+            const float occurrence_penalty = kcpp_data->occurrence_penalty;
             const float typical_p = kcpp_data->typical_p;
             const float tfs_z = kcpp_data->tfs_z;
             const float nsigma = kcpp_data->nsigma;
@@ -3720,7 +3722,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                     }
                 }
 
-                id = SampleLogits(logitsPtr, nctx, n_vocab, last_n_size, repeat_penalty, kcpp_data->rep_pen_slope, presence_penalty,
+                id = SampleLogits(logitsPtr, nctx, n_vocab, last_n_size, repeat_penalty, kcpp_data->rep_pen_slope, presence_penalty, occurrence_penalty,
                 top_k, top_a, top_p, min_p, typical_p, tfs_z, nsigma, temp, rng,
                 kcpp_data->mirostat, kcpp_data->mirostat_tau, kcpp_data->mirostat_eta,
                 kcpp_data->dry_multiplier, kcpp_data->dry_base,
