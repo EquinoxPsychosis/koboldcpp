@@ -1233,6 +1233,99 @@ void sample_rep_pen(int n_ctx, int rep_pen_range, float rep_pen, float rep_pen_s
     candidates->sorted = false;
 }
 
+void sample_freq_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_range, float rep_pen_slope, float frequency_penalty, int min_freq)
+{
+    auto last_n_repeat = std::min(std::min((int)last_n_tokens.size(), rep_pen_range), n_ctx);
+
+    const llama_token * last_tokens =  last_n_tokens.data() + last_n_tokens.size() - last_n_repeat;
+    size_t last_tokens_size = last_n_repeat;
+
+    if (last_tokens_size <= 0 || frequency_penalty == 0.0f) {
+        return;
+    }
+
+    std::unordered_map<llama_token, int> near_map;
+    std::unordered_map<llama_token, int> far_map;
+    std::unordered_map<llama_token, int> freq_map;
+    for (size_t i = 0; i < last_n_repeat; ++i) {
+        if ((i * 2) >= last_n_repeat)
+        {
+            near_map[last_tokens[i]]++;
+        }
+        else
+        {
+            far_map[last_tokens[i]]++;
+        }
+
+        freq_map[last_tokens[i]]++;
+    }
+
+    float freq_pen_reduced = 1.0f + (frequency_penalty*rep_pen_slope);
+    float freq_pen = 1.0f + frequency_penalty;
+    for (size_t i = 0; i < cur_p->size; ++i) {
+        const bool token_in_freq = freq_map.find(cur_p->data[i].id) != freq_map.end();
+        if (!token_in_freq) {
+            continue;
+        }
+
+        size_t near_tally = static_cast<size_t>(near_map.at(cur_p->data[i].id));
+        size_t far_tally  = static_cast<size_t>(far_map.at(cur_p->data[i].id));
+        int freq_tally = freq_map.at(cur_p->data[i].id);
+        if (freq_tally >= min_freq) {
+
+            size_t sub_tally = static_cast<size_t>(freq_tally - (min_freq - 1));
+            if ((far_tally > sub_tally) && sub_tally > 0) {
+                // if amount of far tokens is larger than the subtraction amount then subtract from far_tally and set sub_tally to 0
+                far_tally -= sub_tally;
+                sub_tally = 0;
+            } else {
+                // otherwise do vice versa
+                sub_tally -= far_tally;
+                far_tally = 0;
+            }
+
+            // subtract from near tokens if sub_tally hasn't been used up
+            if (sub_tally > 0) {
+                near_tally -= sub_tally;
+            }
+
+
+
+            if (near_tally >= 1)
+            {
+
+                // iterate over each near token with regular penalty
+                for (size_t j = 0; j < near_tally; ++j) {
+
+                    if (cur_p->data[i].logit <= 0) {
+                        cur_p->data[i].logit *= freq_pen;
+                    } else {
+                        cur_p->data[i].logit /= freq_pen;
+                    }
+                }
+
+            }
+
+            if (far_tally >= 1)
+            {
+
+                // iterate over each far token with reduced penalty
+                for (size_t j = 0; j < far_tally; ++j) {
+
+                    if (cur_p->data[i].logit <= 0) {
+                        cur_p->data[i].logit *= freq_pen_reduced;
+                    } else {
+                        cur_p->data[i].logit /= freq_pen_reduced;
+                    }
+                }
+
+            }
+        }
+    }
+
+    cur_p->sorted = false
+}
+
 void sample_pres_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_range, float presence_penalty) {
     auto last_n_repeat = std::min(std::min((int) last_n_tokens.size(), rep_pen_range), n_ctx);
 
@@ -1260,7 +1353,7 @@ void sample_pres_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_rang
     cur_p->sorted = false;
 }
 
-void sample_occr_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_range, float occurrence_penalty) {
+void sample_occr_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_range, float occurrence_penalty, int min_occr) {
     auto last_n_repeat = std::min(std::min((int) last_n_tokens.size(), rep_pen_range), n_ctx);
 
     const llama_token * last_tokens =  last_n_tokens.data() + last_n_tokens.size() - last_n_repeat;
@@ -1285,9 +1378,17 @@ void sample_occr_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_rang
         }
 
         size_t token_tally = static_cast<size_t>(penalty_map.at(cur_p->data[i].id));
-        for (size_t j = 0; j < token_tally; j++) {
-            cur_p->data[i].logit -= occurrence_penalty;
+        if (token_tally >= static_cast<size_t>(min_occr)) {
+
+            size_t sub_tally = token tally - static_cast<size_t>(min_occr - 1);
+            token_tally -= sub_tally;
+
+            for (size_t j = 0; j < token_tally; j++) {
+                cur_p->data[i].logit -= occurrence_penalty;
+            }
         }
+
+        
     }
 
     cur_p->sorted = false;
