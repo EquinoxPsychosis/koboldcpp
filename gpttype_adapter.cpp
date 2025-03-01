@@ -1738,7 +1738,37 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
         xtc_nsigma_mask = mask_nsigma(&candidates_p, xtc_nsigma);
         sample_top_n_sigma(&candidates_p, nsigma);
 
-        sample_smooth(&candidates_p, smoothing_factor);
+        for (int i = 0; i < sampler_order.size(); i++) {
+            switch (sampler_order[i]) {
+                case KCPP_SAMPLER_TOP_K:
+                    break;
+                case KCPP_SAMPLER_TOP_A:
+                    break;
+                case KCPP_SAMPLER_TOP_P:
+                    break;
+                case KCPP_SAMPLER_TFS:
+                    break;
+                case KCPP_SAMPLER_TYP:
+                    break;
+                case KCPP_SAMPLER_TEMP:
+                    break;
+                case KCPP_SAMPLER_SMOOTH:
+                    sample_smooth(&candidates_p, smoothing_factor);
+                    break;
+                case KCPP_SAMPLER_REP_PEN:
+                    sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, &candidates_p);
+                    break;
+                case KCPP_SAMPLER_PRES_PEN:
+                    sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
+                    break;
+                case KCPP_SAMPLER_OCCR_PEN:
+                    sample_occr_pen(&candidates_p, n_ctx, rep_pen_range, occurrence_penalty);
+                    break;
+                default:
+                    printf("\nSampleLogits: Unknown Sampler : %d", sampler_order[i]);
+                    break;
+            }
+        }
 
         sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
         id = sample_token(&candidates_p, rng);
