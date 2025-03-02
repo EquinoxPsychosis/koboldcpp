@@ -1823,7 +1823,38 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
     }
     else if (nsigma > 0.0f)
     {
-        sample_top_k(&candidates_p, top_k);
+        for (int i = 0; i < sampler_order.size(); i++) {
+            switch (sampler_order[i]) {
+                case KCPP_SAMPLER_TOP_K:
+                    sample_top_k(&candidates_p, top_k);
+                    break;
+                case KCPP_SAMPLER_TOP_A:
+                    break;
+                case KCPP_SAMPLER_TOP_P:
+                    break;
+                case KCPP_SAMPLER_MIN_P:
+                    sample_min_p(&candidates_p, min_p, 1);
+                    break;
+                case KCPP_SAMPLER_TFS:
+                    break;
+                case KCPP_SAMPLER_TYP:
+                    break;
+                case KCPP_SAMPLER_TEMP:
+                    break;
+                case KCPP_SAMPLER_SMOOTH:
+                    break;
+                case KCPP_SAMPLER_REP_PEN:
+                    break;
+                case KCPP_SAMPLER_PRES_PEN:
+                    break;
+                case KCPP_SAMPLER_OCCR_PEN:
+                    break;
+                default:
+                    printf("\nSampleLogits: Unknown Sampler : %d", sampler_order[i]);
+                    break;
+            }
+        }
+
         if (dynatemp_range != 0) {
             float dynatemp_min = temp - dynatemp_range;
             float dynatemp_max = temp + dynatemp_range;
@@ -1839,7 +1870,43 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
         xtc_nsigma_mask = mask_nsigma(&candidates_p, xtc_nsigma);
         sample_top_n_sigma(&candidates_p, nsigma);
 
-        sample_smooth(&candidates_p, smoothing_factor);
+        for (int i = 0; i < sampler_order.size(); i++) {
+            switch (sampler_order[i]) {
+                case KCPP_SAMPLER_TOP_K:
+                    break;
+                case KCPP_SAMPLER_TOP_A:
+                    sample_top_a(&candidates_p, top_a, 1);
+                    break;
+                case KCPP_SAMPLER_TOP_P:
+                    sample_top_p(&candidates_p, top_p, 1);
+                    break;
+                case KCPP_SAMPLER_MIN_P:
+                    break;
+                case KCPP_SAMPLER_TFS:
+                    sample_tail_free(&candidates_p, tfs, 1);
+                    break;
+                case KCPP_SAMPLER_TYP:
+                    sampler_typical(&candidates_p, typical_p, 1)
+                    break;
+                case KCPP_SAMPLER_TEMP:
+                    break;
+                case KCPP_SAMPLER_SMOOTH:
+                    sample_smooth(&candidates_p, smoothing_factor);
+                    break;
+                case KCPP_SAMPLER_REP_PEN:
+                    sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, &candidates_p);
+                    break;
+                case KCPP_SAMPLER_PRES_PEN:
+                    sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
+                    break;
+                case KCPP_SAMPLER_OCCR_PEN:
+                    sample_occr_pen(&candidates_p, n_ctx, rep_pen_range, occurrence_penalty);
+                    break;
+                default:
+                    printf("\nSampleLogits: Unknown Sampler : %d", sampler_order[i]);
+                    break;
+            }
+        }
 
         sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
         id = sample_token(&candidates_p, rng);
@@ -1870,6 +1937,8 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     break;
                 case KCPP_SAMPLER_TOP_P:
                     sample_top_p(&candidates_p, top_p, 1);
+                    break;
+                case KCPP_SAMPLER_MIN_P:
                     sample_min_p(&candidates_p, min_p, 1);
                     break;
                 case KCPP_SAMPLER_TFS:
