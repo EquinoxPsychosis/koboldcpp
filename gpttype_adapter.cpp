@@ -1323,7 +1323,7 @@ void sample_freq_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_rang
         }
     }
 
-    cur_p->sorted = false
+    cur_p->sorted = false;
 }
 
 void sample_pres_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_range, float presence_penalty) {
@@ -1888,7 +1888,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_tail_free(&candidates_p, tfs, 1);
                     break;
                 case KCPP_SAMPLER_TYP:
-                    sampler_typical(&candidates_p, typical_p, 1)
+                    sampler_typical(&candidates_p, typical_p, 1);
                     break;
                 case KCPP_SAMPLER_TEMP:
                     break;
