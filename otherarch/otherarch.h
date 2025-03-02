@@ -35,10 +35,13 @@ struct kcpp_params {
     float   temp              = 0.80f; // 1.0 = disabled
     float   smoothing_factor  = 0.00f; // 0.00 = disabled
     float   repeat_penalty    = 1.10f; // 1.0 = disabled
+    float   frequency_penalty = 0.00f; // 0.0 = disabled
     int32_t repeat_last_n     = 64;    // last n tokens to penalize (0 = disable penalty, -1 = context size)
     float   rep_pen_slope     = 1.0f;
     float   presence_penalty  = 0.00f; // 0.0 = disabled
     float   occurrence_penalty= 0.00f; // 0.0 = disabled
+    int32_t min_freq          = 1;     // 1 = disabled
+    int32_t min_occr          = 1;     // 1 = disabled
     int32_t mirostat          = 0;     // 0 = disabled, 1 = mirostat, 2 = mirostat 2.0
     float   mirostat_tau      = 5.00f; // target entropy
     float   mirostat_eta      = 0.10f; // learning rate

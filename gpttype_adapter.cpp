@@ -1380,7 +1380,7 @@ void sample_occr_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_rang
         size_t token_tally = static_cast<size_t>(penalty_map.at(cur_p->data[i].id));
         if (token_tally >= static_cast<size_t>(min_occr)) {
 
-            size_t sub_tally = token tally - static_cast<size_t>(min_occr - 1);
+            size_t sub_tally = token_tally - static_cast<size_t>(min_occr - 1);
             token_tally -= sub_tally;
 
             for (size_t j = 0; j < token_tally; j++) {
@@ -1773,7 +1773,7 @@ std::unordered_set<llama_token> mask_nsigma(llama_token_data_array * cur_p, floa
     return nsigma_mask;
 }
 
-int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float occurrence_penalty, float top_k, float performance_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
+int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float frequency_penalty, float rep_pen_slope, float presence_penalty, float occurrence_penalty, int min_freq, int min_occr, float top_k, float performance_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
 int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability, float xtc_nsigma,
 const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dynatemp_range, float dynatemp_exponent, float smoothing_factor)
 {
@@ -1845,6 +1845,8 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     break;
                 case KCPP_SAMPLER_REP_PEN:
                     break;
+                case KCPP_SAMPLER_FREQ_PEN:
+                    break;
                 case KCPP_SAMPLER_PRES_PEN:
                     break;
                 case KCPP_SAMPLER_OCCR_PEN:
@@ -1896,6 +1898,9 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                 case KCPP_SAMPLER_REP_PEN:
                     sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, &candidates_p);
                     break;
+                case KCPP_SAMPLER_FREQ_PEN:
+                    sample_freq_pen(&candidates_p, n_ctx, rep_pen_range, rep_pen_slope, frequency_penalty, min_freq);
+                    break;
                 case KCPP_SAMPLER_PRES_PEN:
                     sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
                     break;
@@ -1914,6 +1919,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
     else if (xtc_nsigma > 0.0f)
     {
         sample_top_k(&candidates_p, top_k);
+        sample_min_p(&candidates_p, min_p, 1);
         if (dynatemp_range != 0) {
             float dynatemp_min = temp - dynatemp_range;
             float dynatemp_max = temp + dynatemp_range;
@@ -1939,7 +1945,6 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_top_p(&candidates_p, top_p, 1);
                     break;
                 case KCPP_SAMPLER_MIN_P:
-                    sample_min_p(&candidates_p, min_p, 1);
                     break;
                 case KCPP_SAMPLER_TFS:
                     sample_tail_free(&candidates_p, tfs, 1);
@@ -1954,6 +1959,9 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     break;
                 case KCPP_SAMPLER_REP_PEN:
                     sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, &candidates_p);
+                    break;
+                case KCPP_SAMPLER_FREQ_PEN:
+                    sample_freq_pen(&candidates_p, n_ctx, rep_pen_range, rep_pen_slope, frequency_penalty, min_freq);
                     break;
                 case KCPP_SAMPLER_PRES_PEN:
                     sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
@@ -1983,6 +1991,8 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     break;
                 case KCPP_SAMPLER_TOP_P:
                     sample_top_p(&candidates_p, top_p, 1);
+                    break;
+                case KCPP_SAMPLER_MIN_P:
                     sample_min_p(&candidates_p, min_p, 1);
                     break;
                 case KCPP_SAMPLER_TFS:
@@ -2009,6 +2019,9 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     break;
                 case KCPP_SAMPLER_REP_PEN:
                     sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, &candidates_p);
+                    break;
+                case KCPP_SAMPLER_FREQ_PEN:
+                    sample_freq_pen(&candidates_p, n_ctx, rep_pen_range, rep_pen_slope, frequency_penalty, min_freq);
                     break;
                 case KCPP_SAMPLER_PRES_PEN:
                     sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
@@ -3375,8 +3388,11 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     kcpp_data->repeat_last_n = inputs.rep_pen_range;
     kcpp_data->rep_pen_slope = inputs.rep_pen_slope;
     kcpp_data->repeat_penalty = inputs.rep_pen;
+    kcpp_data->frequency_penalty = inputs.frequency_penalty;
     kcpp_data->presence_penalty = inputs.presence_penalty;
     kcpp_data->occurrence_penalty = inputs.occurrence_penalty;
+    kcpp_data->min_freq = inputs.min_freq;
+    kcpp_data->min_occr = inputs.min_occr;
     kcpp_data->mirostat = inputs.mirostat;
     kcpp_data->mirostat_eta = inputs.mirostat_eta;
     kcpp_data->mirostat_tau = inputs.mirostat_tau;
@@ -3691,6 +3707,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     {
         sampler_order = {
             KCPP_SAMPLER_REP_PEN,
+            KCPP_SAMPLER_FREQ_PEN,
             KCPP_SAMPLER_PRES_PEN,
             KCPP_SAMPLER_OCCR_PEN,
             KCPP_SAMPLER_TOP_K,
@@ -3698,6 +3715,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
             KCPP_SAMPLER_TFS,
             KCPP_SAMPLER_TYP,
             KCPP_SAMPLER_TOP_P,
+            KCPP_SAMPLER_MIN_P,
             KCPP_SAMPLER_TEMP,
             KCPP_SAMPLER_SMOOTH
         };
@@ -3908,6 +3926,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
             const float temp = kcpp_data->temp;
             const float top_a = inputs.top_a;
             const float repeat_penalty = kcpp_data->repeat_penalty;
+            const float frequency_penalty  = kcpp_data->frequency_penalty;
             const float presence_penalty = kcpp_data->presence_penalty;
             const float occurrence_penalty = kcpp_data->occurrence_penalty;
             const float typical_p = kcpp_data->typical_p;
@@ -4007,7 +4026,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                     }
                 }
 
-                id = SampleLogits(logitsPtr, nctx, n_vocab, last_n_size, repeat_penalty, kcpp_data->rep_pen_slope, presence_penalty, occurrence_penalty,
+                id = SampleLogits(logitsPtr, nctx, n_vocab, last_n_size, repeat_penalty, frequency_penalty, kcpp_data->rep_pen_slope, presence_penalty, occurrence_penalty, kcpp_data->min_freq, kcpp_data->min_occr,
                 top_k, performance_k, top_a, top_p, min_p, typical_p, tfs_z, nsigma, temp, rng,
                 kcpp_data->mirostat, kcpp_data->mirostat_tau, kcpp_data->mirostat_eta,
                 kcpp_data->dry_multiplier, kcpp_data->dry_base,
