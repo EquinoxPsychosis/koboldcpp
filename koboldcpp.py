@@ -31,7 +31,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 # constants
-sampler_order_max = 10
+sampler_order_max = 11
 tensor_split_max = 16
 images_max = 8
 bias_min_value = -100.0
@@ -49,7 +49,7 @@ logit_bias_max = 512
 dry_seq_break_max = 128
 
 # global vars
-KcppVersion = "1.85"
+KcppVersion = "s-beta k-1.85"
 showdebug = True
 kcpp_instance = None #global running instance
 global_memory = {"tunnel_url": "", "restart_target":"", "input_to_exit":False, "load_complete":False}

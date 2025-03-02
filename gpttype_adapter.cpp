@@ -1730,6 +1730,8 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                 case KCPP_SAMPLER_TOP_A:
                     break;
                 case KCPP_SAMPLER_TOP_P:
+                    break;
+                case KCPP_SAMPLER_MIN_P:
                     sample_min_p(&candidates_p, min_p, 1);
                     break;
                 case KCPP_SAMPLER_TFS:
@@ -1776,6 +1778,8 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     break;
                 case KCPP_SAMPLER_TOP_P:
                     sample_top_p(&candidates_p, top_p, 1);
+                    break;
+                case KCPP_SAMPLER_MIN_P:
                     break;
                 case KCPP_SAMPLER_TFS:
                     sample_tail_free(&candidates_p, tfs, 1);
@@ -1832,6 +1836,8 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     break;
                 case KCPP_SAMPLER_TOP_P:
                     sample_top_p(&candidates_p, top_p, 1);
+                    break;
+                case KCPP_SAMPLER_MIN_P:
                     sample_min_p(&candidates_p, min_p, 1);
                     break;
                 case KCPP_SAMPLER_TFS:
