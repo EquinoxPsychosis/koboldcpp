@@ -1905,7 +1905,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
                     break;
                 case KCPP_SAMPLER_OCCR_PEN:
-                    sample_occr_pen(&candidates_p, n_ctx, rep_pen_range, occurrence_penalty);
+                    sample_occr_pen(&candidates_p, n_ctx, rep_pen_range, occurrence_penalty, min_occr);
                     break;
                 default:
                     printf("\nSampleLogits: Unknown Sampler : %d", sampler_order[i]);
@@ -1967,7 +1967,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
                     break;
                 case KCPP_SAMPLER_OCCR_PEN:
-                    sample_occr_pen(&candidates_p, n_ctx, rep_pen_range, occurrence_penalty);
+                    sample_occr_pen(&candidates_p, n_ctx, rep_pen_range, occurrence_penalty, min_occr);
                     break;
                 default:
                     printf("\nSampleLogits: Unknown Sampler : %d", sampler_order[i]);
@@ -2027,7 +2027,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_pres_pen(&candidates_p, n_ctx, rep_pen_range, presence_penalty);
                     break;
                 case KCPP_SAMPLER_OCCR_PEN:
-                    sample_occr_pen(&candidates_p, n_ctx, rep_pen_range, occurrence_penalty);
+                    sample_occr_pen(&candidates_p, n_ctx, rep_pen_range, occurrence_penalty, min_occr);
                     break;
                 default:
                     printf("\nSampleLogits: Unknown Sampler : %d",sampler_order[i]);
