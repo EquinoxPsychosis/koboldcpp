@@ -31,7 +31,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 # constants
-sampler_order_max = 11
+sampler_order_max = 12
 tensor_split_max = 16
 images_max = 8
 bias_min_value = -100.0
@@ -199,10 +199,13 @@ class generation_inputs(ctypes.Structure):
                 ("tfs", ctypes.c_float),
                 ("nsigma", ctypes.c_float),
                 ("rep_pen", ctypes.c_float),
+                ("frequency_penalty", ctypes.c_float),
                 ("rep_pen_range", ctypes.c_int),
                 ("rep_pen_slope", ctypes.c_float),
                 ("presence_penalty", ctypes.c_float),
                 ("occurrence_penalty", ctypes.c_float),
+                ("min_freq", ctypes.c_int),
+                ("min_occr", ctypes.c_int),
                 ("mirostat", ctypes.c_int),
                 ("mirostat_tau", ctypes.c_float),
                 ("mirostat_eta", ctypes.c_float),
@@ -1125,10 +1128,13 @@ def generate(genparams, stream_flag=False):
     tfs = float(genparams.get('tfs', 1.0))
     nsigma = float(genparams.get('nsigma', 0.0))
     rep_pen = float(genparams.get('rep_pen', 1.0))
+    frequency_penalty = float(genparams.get('frequency_penalty', 0.0))
     rep_pen_range = int(genparams.get('rep_pen_range', 320))
     rep_pen_slope = float(genparams.get('rep_pen_slope', 1.0))
     presence_penalty = float(genparams.get('presence_penalty', 0.0))
     occurrence_penalty = float(genparams.get('occurrence_penalty', 0.0))
+    min_freq = int(genparams.get('min_freq', 1))
+    min_occr = int(genparams.get('min_occr', 1))
     mirostat = int(genparams.get('mirostat', 0))
     mirostat_tau = float(genparams.get('mirostat_tau', 5.0))
     mirostat_eta = float(genparams.get('mirostat_eta', 0.1))
@@ -1195,10 +1201,13 @@ def generate(genparams, stream_flag=False):
     inputs.tfs = tfs
     inputs.nsigma = nsigma
     inputs.rep_pen = rep_pen
+    inputs.frequency_penalty = frequency_penalty
     inputs.rep_pen_range = rep_pen_range
     inputs.rep_pen_slope = rep_pen_slope
     inputs.presence_penalty = presence_penalty
     inputs.occurrence_penalty = occurrence_penalty
+    inputs.min_freq = min_freq
+    inputs.min_occr = min_occr
     inputs.stream_sse = stream_sse
     inputs.dynatemp_range = dynatemp_range
     inputs.dynatemp_exponent = dynatemp_exponent
