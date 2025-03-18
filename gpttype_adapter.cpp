@@ -1244,82 +1244,33 @@ void sample_freq_pen(llama_token_data_array * cur_p, int n_ctx, int rep_pen_rang
         return;
     }
 
-    std::unordered_map<llama_token, int> near_map;
-    std::unordered_map<llama_token, int> far_map;
-    std::unordered_map<llama_token, int> freq_map;
-    for (size_t i = 0; i < last_n_repeat; ++i) {
-        if ((i * 2) >= last_n_repeat)
-        {
-            near_map[last_tokens[i]]++;
-        }
-        else
-        {
-            far_map[last_tokens[i]]++;
-        }
+    const int64_t t_start_sample_us = ggml_time_us();
 
-        freq_map[last_tokens[i]]++;
+    // create a penalty map of token occurrences within penalty range
+    std::unordered_map<llama_token, int> penalty_map;
+    for (size_t i = 0; i < last_n_repeat; ++i) {
+        penalty_map[last_tokens[i]]++;
     }
 
-    float freq_pen_reduced = 1.0f + (frequency_penalty*rep_pen_slope);
-    float freq_pen = 1.0f + frequency_penalty;
     for (size_t i = 0; i < cur_p->size; ++i) {
-        const bool token_in_freq = freq_map.find(cur_p->data[i].id) != freq_map.end();
-        if (!token_in_freq) {
+        const bool token_in_map = penalty_map.find(cur_p->data[i].id) != penalty_map.end();
+        if (!token_in_map) {
             continue;
         }
 
-        size_t near_tally = static_cast<size_t>(near_map.at(cur_p->data[i].id));
-        size_t far_tally  = static_cast<size_t>(far_map.at(cur_p->data[i].id));
-        int freq_tally = freq_map.at(cur_p->data[i].id);
-        if (freq_tally >= min_freq) {
+        size_t token_tally = static_cast<size_t>(penalty_map.at(cur_p->data[i].id));
+        if (token_tally >= static_cast<size_t>(min_freq)) {
+            size_t sub_tally = token_tally - static_cast<size_t>(min_freq - 1);
+            token_tally -= sub_tally;
 
-            size_t sub_tally = static_cast<size_t>(freq_tally - (min_freq - 1));
-            if ((far_tally > sub_tally) && sub_tally > 0) {
-                // if amount of far tokens is larger than the subtraction amount then subtract from far_tally and set sub_tally to 0
-                far_tally -= sub_tally;
-                sub_tally = 0;
-            } else {
-                // otherwise do vice versa
-                sub_tally -= far_tally;
-                far_tally = 0;
-            }
-
-            // subtract from near tokens if sub_tally hasn't been used up
-            if (sub_tally > 0) {
-                near_tally -= sub_tally;
-            }
-
-
-
-            if (near_tally >= 1)
-            {
-
-                // iterate over each near token with regular penalty
-                for (size_t j = 0; j < near_tally; ++j) {
-
-                    if (cur_p->data[i].logit <= 0) {
-                        cur_p->data[i].logit *= freq_pen;
-                    } else {
-                        cur_p->data[i].logit /= freq_pen;
-                    }
+            for (size_t j = 0; j < token_tally; j++) {
+                if (cur_p->data[i].logit <= 0) {
+                    cur_p->data[i].logit *= frequency_penalty;
+                } else {
+                    cur_p->data[i].logit /= frequency_penalty;
                 }
-
             }
 
-            if (far_tally >= 1)
-            {
-
-                // iterate over each far token with reduced penalty
-                for (size_t j = 0; j < far_tally; ++j) {
-
-                    if (cur_p->data[i].logit <= 0) {
-                        cur_p->data[i].logit *= freq_pen_reduced;
-                    } else {
-                        cur_p->data[i].logit /= freq_pen_reduced;
-                    }
-                }
-
-            }
         }
     }
 
