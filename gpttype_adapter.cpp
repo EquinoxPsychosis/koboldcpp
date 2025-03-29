@@ -847,7 +847,7 @@ llama_token sample_token_mirostat(int n_vocab, llama_token_data_array * candidat
     float epsilon_hat = s_hat - 1;
     float k = powf((epsilon_hat * powf(2, *mu)) / (1 - powf(N, -epsilon_hat)), 1 / s_hat);
     // Sample the next word X using top-k sampling
-    sample_top_k(candidates, int(k));
+    sample_top_k(candidates, int(k), 0.0f);
     llama_token X = sample_token(candidates, rng);    // Compute error as the difference between observed surprise and target surprise value
     size_t X_idx = std::distance(candidates->data, std::find_if(candidates->data, candidates->data + candidates->size, [&](const llama_token_data & candidate) {
         return candidate.id == X;
@@ -1634,7 +1634,7 @@ void sample_temperature(llama_token_data_array * candidates_p, float temp)
 
     if(isgreedy)
     {
-        sample_top_k(candidates_p, 1); //only want first candidate
+        sample_top_k(candidates_p, 1, 0.0f); //only want first candidate
     }
 }
 
@@ -1761,7 +1761,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
     sample_dry(n_ctx, dry_penalty_last_n, dry_multiplier, dry_base, dry_allowed_length, dry_sequence_breakers, &candidates_p);
 
     //prefilter to top 3k tokens for improved speed
-    sample_top_k(&candidates_p, performance_k);
+    sample_top_k(&candidates_p, performance_k, 0.0f);
 
     if (mirostat == 1 || mirostat == 2)
     {
