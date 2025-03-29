@@ -708,11 +708,14 @@ void sample_softmax(llama_token_data_array * cur_p) {
     }
 }
 
-void sample_top_k(llama_token_data_array * cur_p, int32_t k) {
+void sample_top_k(llama_token_data_array * cur_p, int32_t k, float nsigma) {
     // TODO: move bucket sort to separate function so that top_p/tail_free/typical/softmax first is equally fast
     // if (k >= (int32_t)cur_p->size) {
     //     return;
     // }
+    if (nsigma > 0.0f) {
+        return;
+    }
 
     if (k <= 0) {
         k = cur_p->size;
@@ -1371,7 +1374,7 @@ void sample_top_p(llama_token_data_array * cur_p, float p, size_t min_keep) {
     cur_p->size = last_idx;
 }
 
-void sample_min_p(llama_token_data_array * cur_p, float p, size_t min_keep) {
+void sample_min_p(llama_token_data_array * cur_p, float p, size_t min_keep, size_t top_k, float nsigma) {
     if (p <= 0.0f || !cur_p->size) {
         return;
     }
@@ -1379,7 +1382,7 @@ void sample_min_p(llama_token_data_array * cur_p, float p, size_t min_keep) {
     bool min_p_applied = false;
 
     // if the cur_p aren't sorted, try the unsorted implementation first
-    if (!cur_p->sorted) {
+    if (!cur_p->sorted && nsigma <= 0.0f) {
         std::vector<llama_token_data> filtered_tokens;
 
         float max_logit = -FLT_MAX;
@@ -1422,7 +1425,11 @@ void sample_min_p(llama_token_data_array * cur_p, float p, size_t min_keep) {
         }
 
         // Resize the output vector to keep only the matching tokens
-        cur_p->size = i;
+        if ((top_k > 1 && top_k < 201) && nsigma > 0.0f) {
+            cur_p->size = i + top_k;
+        } else {
+            cur_p->size = i;
+        }
     }
 }
 
@@ -1774,39 +1781,9 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
     }
     else if (nsigma > 0.0f)
     {
-        for (int i = 0; i < sampler_order.size(); i++) {
-            switch (sampler_order[i]) {
-                case KCPP_SAMPLER_TOP_K:
-                    sample_top_k(&candidates_p, top_k);
-                    break;
-                case KCPP_SAMPLER_TOP_A:
-                    break;
-                case KCPP_SAMPLER_TOP_P:
-                    break;
-                case KCPP_SAMPLER_MIN_P:
-                    sample_min_p(&candidates_p, min_p, 1);
-                    break;
-                case KCPP_SAMPLER_TFS:
-                    break;
-                case KCPP_SAMPLER_TYP:
-                    break;
-                case KCPP_SAMPLER_TEMP:
-                    break;
-                case KCPP_SAMPLER_SMOOTH:
-                    break;
-                case KCPP_SAMPLER_REP_PEN:
-                    break;
-                case KCPP_SAMPLER_FREQ_PEN:
-                    break;
-                case KCPP_SAMPLER_PRES_PEN:
-                    break;
-                case KCPP_SAMPLER_OCCR_PEN:
-                    break;
-                default:
-                    printf("\nSampleLogits: Unknown Sampler : %d", sampler_order[i]);
-                    break;
-            }
-        }
+
+        sample_top_k(&candidates_p, top_k, nsigma);
+        sample_min_p(&candidates_p, min_p, 1, top_k, nsigma);
 
         if (dynatemp_range != 0) {
             float dynatemp_min = temp - dynatemp_range;
@@ -1869,8 +1846,8 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
     }
     else if (xtc_nsigma > 0.0f)
     {
-        sample_top_k(&candidates_p, top_k);
-        sample_min_p(&candidates_p, min_p, 1);
+        sample_top_k(&candidates_p, top_k, nsigma);
+        sample_min_p(&candidates_p, min_p, 1, top_k, nsigma);
         if (dynatemp_range != 0) {
             float dynatemp_min = temp - dynatemp_range;
             float dynatemp_max = temp + dynatemp_range;
@@ -1935,7 +1912,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
         {
             switch (sampler_order[i]) {
                 case KCPP_SAMPLER_TOP_K:
-                    sample_top_k(&candidates_p, top_k);
+                    sample_top_k(&candidates_p, top_k, nsigma);
                     break;
                 case KCPP_SAMPLER_TOP_A:
                     sample_top_a(&candidates_p, top_a, 1);
@@ -1944,7 +1921,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_top_p(&candidates_p, top_p, 1);
                     break;
                 case KCPP_SAMPLER_MIN_P:
-                    sample_min_p(&candidates_p, min_p, 1);
+                    sample_min_p(&candidates_p, min_p, 1, top_k, nsigma);
                     break;
                 case KCPP_SAMPLER_TFS:
                     sample_tail_free(&candidates_p, tfs, 1);
