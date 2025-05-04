@@ -113,6 +113,13 @@ struct generation_inputs
     const bool grammar_retain_state = false;
     const float dynatemp_range = 0.0f;
     const float dynatemp_exponent = 1.0f;
+    const int dynaxtc = 0;
+    const float min_thres = 0.075;
+    const float max_thres = 0.15;
+    const float min_prob = 0.25;
+    const float max_prob = 0.5;
+    const float exponent_thres = 1.55;
+    const float exponent_prob = 0.75;
     const float smoothing_factor = 0.0f;
     const float dry_multiplier = 0.0f;
     const float dry_base = 0.0f;

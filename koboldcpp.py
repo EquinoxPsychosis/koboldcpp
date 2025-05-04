@@ -222,6 +222,13 @@ class generation_inputs(ctypes.Structure):
                 ("grammar_retain_state", ctypes.c_bool),
                 ("dynatemp_range", ctypes.c_float),
                 ("dynatemp_exponent", ctypes.c_float),
+                ("dynaxtc", ctypes.c_int),
+                ("min_thres", ctypes.c_float),
+                ("max_thres", ctypes.c_float),
+                ("min_prob", ctypes.c_float),
+                ("max_prob", ctypes.c_float),
+                ("exponent_thres", ctypes.c_float),
+                ("exponent_prob", ctypes.c_float),
                 ("smoothing_factor", ctypes.c_float),
                 ("dry_multiplier", ctypes.c_float),
                 ("dry_base", ctypes.c_float),
@@ -1157,6 +1164,13 @@ def generate(genparams, stream_flag=False):
     trimstop = genparams.get('trim_stop', True)
     dynatemp_range = float(genparams.get('dynatemp_range', 0.0))
     dynatemp_exponent = float(genparams.get('dynatemp_exponent', 1.0))
+    dynaxtc = int(genparams.get('dynaxtc', 0))
+    min_thres = float(genparams.get('min_thres', 0.075))
+    max_thres = float(genparams.get('max_thres', 0.15))
+    min_prob = float(genparams.get('min_prob', 0.25))
+    max_prob = float(genparams.get('max_prob', 0.5))
+    exponent_thres = float(genparams.get('exponent_thres', 1.55))
+    exponent_prob = float(genparams.get('exponent_prob', 0.75))
     smoothing_factor = float(genparams.get('smoothing_factor', 0.0))
     logit_biases = genparams.get('logit_bias', {})
     render_special = genparams.get('render_special', False)
@@ -1211,6 +1225,13 @@ def generate(genparams, stream_flag=False):
     inputs.stream_sse = stream_sse
     inputs.dynatemp_range = dynatemp_range
     inputs.dynatemp_exponent = dynatemp_exponent
+    inputs.dynaxtc = dynaxtc
+    inputs.min_thres = min_thres
+    inputs.max_thres = max_thres
+    inputs.min_prob = min_prob
+    inputs.max_prob = max_prob
+    inputs.exponent_thres = exponent_thres
+    inputs.exponent_prob = exponent_prob
     inputs.smoothing_factor = smoothing_factor
     inputs.grammar = grammar.encode("UTF-8")
     inputs.grammar_retain_state = grammar_retain_state

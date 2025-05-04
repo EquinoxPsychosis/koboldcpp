@@ -986,6 +986,75 @@ void sample_xtc(llama_token_data_array * cur_p, float xtc_threshold, float xtc_p
 
 }
 
+void sample_ent_xtc(llama_token_data_array * cur_p, float min_thres, float max_thres, float min_prob, float max_prob, float exponent_thres, float exponent_prob, std::mt19937 & rng) {
+    // no need to do anything if there is only one (or zero) candidates
+    if (min_thres > 0.5f || max_prob <= 0.0f || cur_p->size <= 1) {
+        return;
+    }
+
+    // Calculate maximum possible entropy
+    float max_entropy = -logf(1.0f / cur_p->size);
+
+    sample_softmax(cur_p);
+
+    // Calculate entropy of the softmax probabilities
+    float entropy = 0.0f;
+    for (size_t i = 0; i < cur_p->size; ++i) {
+        float prob = cur_p->data[i].p;
+        if (prob > 0.0f) {  // Ensure no log(0)
+            entropy -= prob * logf(prob);
+        }
+    }
+
+    // Normalize the entropy (max_entropy cannot be 0 here because we checked cur_p->size != 1 above)
+    float normalized_entropy = entropy / max_entropy;
+
+    // Map the normalized entropy to the desired temperature range using the power function
+    float dyn_thres = min_thres + (max_thres - min_thres) * powf(normalized_entropy, exponent_thres);
+    float dyn_prob = max_prob - (max_prob - min_prob) * powf(normalized_entropy, exponent_prob);
+
+    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+    float roll = dist(rng);
+    if (roll >= dyn_prob)  // if dice roll fails, skip xtc
+    {
+        return;
+    }
+
+    // calculate how many tokens cross the xtc threshold
+    size_t last_idx = cur_p->size;
+    for (size_t i = 0; i < cur_p->size; ++i) {
+        float checkprob = cur_p->data[i].p;
+        if (checkprob < dyn_thres) {
+            last_idx = i;
+            break;
+        }
+    }
+
+    if (last_idx > 1)  // check if there are 2 or more viable candidates
+    {
+        if (debugmode == 1 && !is_quiet) {
+            printf("XTC penalties [");
+        }
+        // then remove all other tokens above threshold EXCEPT the least likely one
+        for (size_t i = 0; i < last_idx - 1; ++i) {
+            if (debugmode == 1 && !is_quiet) {
+                gpt_vocab::id token        = cur_p->data[i].id;
+                std::string   tokenizedstr = FileFormatTokenizeID(token, file_format);
+                ::utreplace(tokenizedstr, "\n", "\\n");
+                printf("%s(%s %.02f%%)", i == 0 ? "" : " ", RemoveBell(tokenizedstr).c_str(), 100.f * cur_p->data[i].p);
+            }
+            cur_p->data[i].logit -= 999.0f;  // infinity gets wonky results downstream, this hack works well enough
+        }
+        if (debugmode == 1 && !is_quiet) {
+            printf("]\n");
+        }
+    }  // otherwise xtc does not do anything
+
+    if (last_idx > 1) {
+        cur_p->sorted = false;
+    }
+}
+
 void sample_dry(int n_ctx, int penalty_range, float penalty_multiplier, float penalty_base, int allowed_length, const std::unordered_multimap<gpt_vocab::id, std::vector<gpt_vocab::id>>& restart_sequences, llama_token_data_array * candidates) {
     if (penalty_multiplier <= 0.0f || penalty_base <= 0.0f) {
         return;
@@ -1733,7 +1802,7 @@ std::unordered_set<llama_token> mask_nsigma(llama_token_data_array * cur_p, floa
 
 int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float frequency_penalty, float rep_pen_slope, float presence_penalty, float occurrence_penalty, int min_freq, int min_occr, float top_k, float performance_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
 int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability, float xtc_nsigma,
-const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dynatemp_range, float dynatemp_exponent, float smoothing_factor)
+const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dynatemp_range, float dynatemp_exponent, int dynaxtc, float min_thres, float max_thres, float min_prob, float max_prob, float exponent_thres, float exponent_prob, float smoothing_factor)
 {
     int id = 0;
 
@@ -1841,7 +1910,11 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
             }
         }
 
-        sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        if (dynaxtc == 1) {
+            sample_ent_xtc(&candidates_p, min_thres, max_thres, min_prob, max_prob, exponent_thres, exponent_prob, rng);
+        } else {
+            sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        }
         id = sample_token(&candidates_p, rng);
     }
     else if (xtc_nsigma > 0.0f)
@@ -1903,7 +1976,11 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
             }
         }
         //xtc always last
-        sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        if (dynaxtc == 1) {
+            sample_ent_xtc(&candidates_p, min_thres, max_thres, min_prob, max_prob, exponent_thres, exponent_prob, rng);
+        } else {
+            sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        }
         id = sample_token(&candidates_p, rng);
     }
     else
@@ -1963,7 +2040,11 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
             }
         }
         //xtc always last
-        sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        if (dynaxtc == 1) {
+            sample_ent_xtc(&candidates_p, min_thres, max_thres, min_prob, max_prob, exponent_thres, exponent_prob, rng);
+        } else {
+            sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        }
         id = sample_token(&candidates_p, rng);
     }
 
@@ -3333,6 +3414,13 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     kcpp_data->xtc_nsigma = inputs.xtc_nsigma;
     kcpp_data->dynatemp_range = inputs.dynatemp_range;
     kcpp_data->dynatemp_exponent = inputs.dynatemp_exponent;
+    kcpp_data->dynaxtc = inputs.dynaxtc;
+    kcpp_data->min_thres = inputs.min_thres;
+    kcpp_data->max_thres = inputs.max_thres;
+    kcpp_data->min_prob = inputs.min_prob;
+    kcpp_data->max_prob = inputs.max_prob;
+    kcpp_data->exponent_thres = inputs.exponent_thres;
+    kcpp_data->exponent_prob = inputs.exponent_prob;
     kcpp_data->n_ctx = inputs.max_context_length;
     kcpp_data->smoothing_factor = inputs.smoothing_factor;
 
@@ -3959,7 +4047,9 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                 kcpp_data->mirostat, kcpp_data->mirostat_tau, kcpp_data->mirostat_eta,
                 kcpp_data->dry_multiplier, kcpp_data->dry_base,
                 kcpp_data->dry_allowed_length, kcpp_data->dry_penalty_last_n, kcpp_data->xtc_threshold, kcpp_data->xtc_probability, kcpp_data->xtc_nsigma,
-                sampler_order, grammar, dynatemp_range, dynatemp_exponent, smoothing_factor);
+                sampler_order, grammar, dynatemp_range, dynatemp_exponent,
+                kcpp_data->dynaxtc, kcpp_data->min_thres, kcpp_data->max_thres, kcpp_data->min_prob, kcpp_data->max_prob, kcpp_data->exponent_thres, kcpp_data->exponent_prob,
+                smoothing_factor);
 
                 if(draft_used)
                 {
