@@ -1910,10 +1910,12 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
             }
         }
 
-        if (dynaxtc == 1) {
-            sample_ent_xtc(&candidates_p, min_thres, max_thres, min_prob, max_prob, exponent_thres, exponent_prob, rng);
-        } else {
-            sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        if (xtc_probability > 0.0) {
+            if (dynaxtc == 1) {
+                sample_ent_xtc(&candidates_p, min_thres, max_thres, min_prob, max_prob, exponent_thres, exponent_prob, rng);
+            } else {
+                sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+            }
         }
         id = sample_token(&candidates_p, rng);
     }
@@ -1976,10 +1978,12 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
             }
         }
         //xtc always last
-        if (dynaxtc == 1) {
-            sample_ent_xtc(&candidates_p, min_thres, max_thres, min_prob, max_prob, exponent_thres, exponent_prob, rng);
-        } else {
-            sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        if (xtc_probability > 0.0) {
+            if (dynaxtc == 1) {
+                sample_ent_xtc(&candidates_p, min_thres, max_thres, min_prob, max_prob, exponent_thres, exponent_prob, rng);
+            } else {
+                sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+            }
         }
         id = sample_token(&candidates_p, rng);
     }
@@ -2040,10 +2044,12 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
             }
         }
         //xtc always last
-        if (dynaxtc == 1) {
-            sample_ent_xtc(&candidates_p, min_thres, max_thres, min_prob, max_prob, exponent_thres, exponent_prob, rng);
-        } else {
-            sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+        if (xtc_probability > 0.0) {
+            if (dynaxtc == 1) {
+                sample_ent_xtc(&candidates_p, min_thres, max_thres, min_prob, max_prob, exponent_thres, exponent_prob, rng);
+            } else {
+                sample_xtc(&candidates_p, xtc_threshold, xtc_probability, xtc_nsigma, xtc_nsigma_mask, rng);
+            }
         }
         id = sample_token(&candidates_p, rng);
     }
