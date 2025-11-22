@@ -1477,6 +1477,55 @@ void sample_top_n_sigma(llama_token_data_array * cur_p, float nsigma) {
     sample_softmax(cur_p);
 }
 
+void sample_top_h(llama_token_data_array * cur_p, float coef, size_t top_n) {
+    if ((coef < 0.0f || coef >= 1.0f) || cur_p->size < 2) {
+        return;
+    }
+
+    top_n = std::min(top_n, cur_p->size);
+
+    // Sort and normalize logits
+    sample_softmax(cur_p);
+
+    float alpha = 0.0f;
+    // Calculate sum of probabilities of the top 100 most probable tokens
+    for (size_t i = 0; i < top_n; ++i) {
+        alpha += cur_p->data[i].p;
+    }
+
+    float entropy = 0.0f;
+    // Calculate entropy
+    for (size_t i = 0; i < top_n; ++i) {
+        float entropy_a = cur_p->data[i].p / alpha;
+        entropy -= entropy_a * log2(entropy_a);
+    }
+
+    // Caclulate tau
+    float tau = ((entropy - log2(alpha)) * alpha) * coef;
+
+    size_t keep_tokens = 0;
+    float  sigma       = cur_p->data[0].p;
+    float  H           = -cur_p->data[0].p * log2(cur_p->data[0].p);
+    // Find which tokens to keep from entropy thresholding
+    for (size_t i = 0; i < top_n; ++i) {
+        keep_tokens++;
+
+        float next_p = cur_p->data[i + 1].p;
+        H -= next_p * log2(next_p);
+        sigma += next_p;
+
+        float entropy_diff = ((H / sigma) + log2(sigma));
+        float threshold    = (tau / sigma + log2(sigma));
+
+        if (entropy_diff > threshold) {
+            break;
+        }
+    }
+
+    // Trim down to keep_tokens mask
+    cur_p->size = keep_tokens;
+}
+
 void sample_entropy(llama_token_data_array * cur_p, float min_temp, float max_temp, float exponent_val) {
     // no need to do anything if there is only one (or zero) candidates
     if (cur_p->size <= 1) {
@@ -1643,7 +1692,7 @@ bool sample_smooth_idx(const std::vector<samplers> & sampler_order, const sample
             comparePos == sampler_order.end()));
 }
 
-int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float top_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float temp, std::mt19937 & rng,
+int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float top_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float top_h, float temp, std::mt19937 & rng,
 int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability,
 const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dynatemp_range, float dynatemp_exponent, float smoothing_factor)
 {
@@ -1717,6 +1766,7 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_temperature(&candidates_p, temp);
                 }
 
+                sample_top_h(&candidates_p, top_h, 100);
                 sample_top_n_sigma(&candidates_p, nsigma);
                 sample_smooth(&candidates_p, smoothing_factor);
                 break;
@@ -3413,6 +3463,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     kcpp_data->typical_p = inputs.typical_p;
     kcpp_data->tfs_z = inputs.tfs;
     kcpp_data->nsigma = inputs.nsigma;
+    kcpp_data->top_h = inputs.top_h;
     kcpp_data->temp = inputs.temperature;
     kcpp_data->repeat_last_n = inputs.rep_pen_range;
     kcpp_data->rep_pen_slope = inputs.rep_pen_slope;
@@ -4101,6 +4152,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
             const float typical_p = kcpp_data->typical_p;
             const float tfs_z = kcpp_data->tfs_z;
             const float nsigma = kcpp_data->nsigma;
+            const float top_h = kcpp_data->top_h;
             const float dynatemp_range = kcpp_data->dynatemp_range;
             const float dynatemp_exponent = kcpp_data->dynatemp_exponent;
             const float smoothing_factor = kcpp_data->smoothing_factor;
@@ -4205,11 +4257,13 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                     }
                 }
 
-                id = SampleLogits(logitsPtr, nctx, n_vocab, last_n_size, repeat_penalty, kcpp_data->rep_pen_slope, presence_penalty,
-                top_k, top_a, top_p, min_p, typical_p, tfs_z, nsigma, temp, rng,
+                id = SampleLogits(logitsPtr, nctx, n_vocab, last_n_size,
+                repeat_penalty, kcpp_data->rep_pen_slope, presence_penalty,
+                top_k, top_a, top_p, min_p, typical_p, tfs_z, nsigma, top_h, temp, rng,
                 kcpp_data->mirostat, kcpp_data->mirostat_tau, kcpp_data->mirostat_eta,
                 kcpp_data->dry_multiplier, kcpp_data->dry_base,
-                kcpp_data->dry_allowed_length, kcpp_data->dry_penalty_last_n, kcpp_data->xtc_threshold, kcpp_data->xtc_probability,
+                kcpp_data->dry_allowed_length, kcpp_data->dry_penalty_last_n,
+                kcpp_data->xtc_threshold, kcpp_data->xtc_probability,
                 sampler_order, grammar, dynatemp_range, dynatemp_exponent, smoothing_factor);
 
                 if(draft_used)
