@@ -244,6 +244,10 @@ NVCCFLAGS += -Wno-deprecated-gpu-targets \
              -gencode arch=compute_80,code=compute_80 \
              -gencode arch=compute_86,code=compute_86
 
+else ifdef LLAMA_ARCHES_MY_PC
+NVCCFLAGS += -Wno-deprecated-gpu-targets \
+             -gencode arch=compute_89,code=compute_89
+
 else
 NVCCFLAGS += -Wno-deprecated-gpu-targets -arch=all
 endif
