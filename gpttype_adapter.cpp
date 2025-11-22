@@ -1684,8 +1684,6 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
         }
     }
 
-    bool minp_smooth = sample_smooth_idx(sampler_order, samplers(2), samplers(5));
-
     for (int i = 0; i < sampler_order.size(); i++)
     {
         switch (sampler_order[i])
@@ -1699,8 +1697,6 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
             case KCPP_SAMPLER_TOP_P:
                 sample_top_p(&candidates_p, top_p, 1);
                 sample_min_p(&candidates_p, min_p, 1);
-
-                if (minp_smooth){ sample_smooth(&candidates_p, smoothing_factor); }
                 break;
             case KCPP_SAMPLER_TFS:
                 sample_tail_free(&candidates_p, tfs, 1);
@@ -1721,8 +1717,8 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
                     sample_temperature(&candidates_p, temp);
                 }
 
-                if (nsigma > 0.0f){ sample_top_n_sigma(&candidates_p, nsigma); }
-                if (!minp_smooth){ sample_smooth(&candidates_p, smoothing_factor); }
+                sample_top_n_sigma(&candidates_p, nsigma);
+                sample_smooth(&candidates_p, smoothing_factor);
                 break;
             case KCPP_SAMPLER_REP_PEN:
                 sample_rep_pen(n_ctx, rep_pen_range, rep_pen, rep_pen_slope, presence_penalty, &candidates_p);
