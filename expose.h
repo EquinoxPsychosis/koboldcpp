@@ -107,6 +107,13 @@ struct generation_inputs
     const float mirostat_tau = 0.0f;
     const float xtc_threshold = 0.0f;
     const float xtc_probability = 0.0f;
+    const float pity_eta = 0.0f;
+    const float pity_probability = 0.00f;
+    const int pity_reset = 0;
+    const float pity_top = 0.0f;
+    const float pity_middle = 0.0f;
+    const float pity_bottom = 0.0f;
+    const float pity_ratio = 0.0f;
     const samplers sampler_order[KCPP_SAMPLER_MAX] = {};
     const int sampler_len = 0;
     const bool allow_eos_token = false;

@@ -35,7 +35,7 @@ struct kcpp_params {
     float   smoothing_factor  = 0.00f; // 0.00 = disabled
     float   repeat_penalty    = 1.10f; // 1.0 = disabled
     int32_t repeat_last_n     = 64;    // last n tokens to penalize (0 = disable penalty, -1 = context size)
-    float   rep_pen_slope     = 1.0f;
+    float   rep_pen_slope     = 1.00f;
     float   presence_penalty  = 0.00f; // 0.0 = disabled
     int32_t mirostat          = 0;     // 0 = disabled, 1 = mirostat, 2 = mirostat 2.0
     float   mirostat_tau      = 5.00f; // target entropy
@@ -45,10 +45,17 @@ struct kcpp_params {
     int32_t dry_allowed_length = 2;    // repeated sequences longer than this are penalized
     int32_t dry_penalty_last_n = 0;    // how many tokens to scan for repetitions (0 = entire context)
     std::vector<std::string> dry_sequence_breakers; // DRY sequence breakers
-    float xtc_threshold        = 0;
-    float xtc_probability      = 0;
-    float   dynatemp_range     = 0.0f;  // enables DynaTemp if neq 0. dynatemp_min = temperature - dt_range, dynatemp_max = temperature + dt_range
-    float   dynatemp_exponent  = 1.0f;
+    float   xtc_threshold      = 0;
+    float   xtc_probability    = 0;
+    float   pity_eta           = 5.00f;// Probability change rate per activation
+    float   pity_probability   = 0.00f;// Activation probability 0 = disabled
+    int32_t pity_reset         = 50;   // How many activations before Top/Middle/Bottom Pity get reset to their default values
+    float   pity_top           = 0.50f;// Probability weight to trim to top tokens
+    float   pity_middle        = 0.25f;// Probability weight to trim to middle tokens
+    float   pity_bottom        = 0.75f;// Probability weight to trim to bottom tokens
+    float   pity_ratio         = 0.85f;// Ammount of tokens to trim for Top/Middle/Bottom Pity
+    float   dynatemp_range     = 0.00f;// enables DynaTemp if neq 0. dynatemp_min = temperature - dt_range, dynatemp_max = temperature + dt_range
+    float   dynatemp_exponent  = 1.00f;
 
     std::string model_filename       = ""; // model path
     std::string prompt               = "";

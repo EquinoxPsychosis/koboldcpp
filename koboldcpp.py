@@ -242,6 +242,13 @@ class generation_inputs(ctypes.Structure):
                 ("mirostat_eta", ctypes.c_float),
                 ("xtc_threshold", ctypes.c_float),
                 ("xtc_probability", ctypes.c_float),
+                ("pity_eta", ctypes.c_float),
+                ("pity_probability", ctypes.c_float),
+                ("pity_reset", ctypes.c_int),
+                ("pity_top", ctypes.c_float),
+                ("pity_middle", ctypes.c_float),
+                ("pity_bottom", ctypes.c_float),
+                ("pity_ratio", ctypes.c_float),
                 ("sampler_order", ctypes.c_int * sampler_order_max),
                 ("sampler_len", ctypes.c_int),
                 ("allow_eos_token", ctypes.c_bool),
@@ -1502,6 +1509,13 @@ def generate(genparams, stream_flag=False):
     dry_sequence_breakers = genparams.get('dry_sequence_breakers', [])
     xtc_threshold = tryparsefloat(genparams.get('xtc_threshold', 0.2),0.2)
     xtc_probability = tryparsefloat(genparams.get('xtc_probability', 0),0)
+    pity_eta = tryparsefloat(genparams.get('pity_eta', 5.0), 5.0)
+    pity_probability = tryparsefloat(genparams.get('pity_probability', 0.0), 0.0)
+    pity_reset = tryparseint(genparams.get('pity_reset', 50), 50)
+    pity_top = tryparsefloat(genparams.get('pity_top', 0.75), 0.75)
+    pity_middle = tryparsefloat(genparams.get('pity_middle', 0.25), 0.25)
+    pity_bottom = tryparsefloat(genparams.get('pity_bottom', 0.5), 0.5)
+    pity_ratio = tryparsefloat(genparams.get('pity_ratio', 0.85), 0.85)
     sampler_order = genparams.get('sampler_order', [6, 0, 1, 3, 4, 2, 5])
     seed = tryparseint(genparams.get('sampler_seed', -1),-1)
     stop_sequence = genparams.get('stop_sequence', [])
@@ -1600,6 +1614,13 @@ def generate(genparams, stream_flag=False):
     inputs.dry_base = dry_base
     inputs.xtc_threshold = xtc_threshold
     inputs.xtc_probability = xtc_probability
+    inputs.pity_eta = pity_eta
+    inputs.pity_probability = pity_probability
+    inputs.pity_reset = pity_reset
+    inputs.pity_top = pity_top
+    inputs.pity_middle = pity_middle
+    inputs.pity_bottom = pity_bottom
+    inputs.pity_ratio = pity_ratio
     inputs.dry_allowed_length = dry_allowed_length
     inputs.dry_penalty_last_n = dry_penalty_last_n
     # Handle dry_sequence_breakers being passed as a json-encoded array of
