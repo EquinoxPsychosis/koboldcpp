@@ -1008,6 +1008,172 @@ void sample_xtc(llama_token_data_array * candidates, float xtc_threshold, float 
 
 }
 
+void sample_pity(
+    llama_token_data_array * cur_p,
+    float p_eta, float p_prob, int p_reset,
+    float p_top, float p_mid, float p_bot, float p_ratio,
+    std::mt19937 & rng,
+    float * cur_top, float * cur_mid, float * cur_bot, float * pity, int * hit
+) {
+    if (p_prob <= 0.0f) { return; } // Disable pity sampler if probability is 0
+
+    // Define 2 differnet roll ranges for different return values when using the same seed
+    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+    std::uniform_real_distribution<float> dist2(0.0f, 2.0f);
+    float roll = dist(rng);
+    // Apply pity prob to roll prob
+    float t_prob = p_prob + *pity; 
+    if (t_prob > 1.0f) { t_prob = 1.0f; } // Limit prob to 100%
+
+    if (roll > t_prob) { return; }
+
+    if (cur_p->size <= 1) { // If not enough tokens, increase sampler prob instead
+
+        *pity = *pity + (p_eta / 100.0f);
+        return;
+    }
+
+    // Normalize and sort tokens
+    sample_softmax(cur_p);
+
+    float r_top = (*cur_top * (1.0f / (*cur_top + *cur_mid + *cur_bot))) * 2.0f;
+    float r_bot = ((*cur_bot * (1.0f / (*cur_top + *cur_mid + *cur_bot))) * 2.0f) + r_top;
+    float roll2 = dist2(rng);
+
+    float p_lr = (p_eta/100.0f);
+
+    if (roll2 <= r_top) { // Trim up to n top tokens
+
+        // Calculate value for top tokens mask using trim ratio
+        size_t keep_tokens = static_cast<size_t>(
+            round(static_cast<float>(cur_p->size) * (1.0f - p_ratio))
+        );
+
+        // Prevent removing all tokens
+        if ( keep_tokens == 0 ) { keep_tokens = 1; }
+
+        // Trim up to top tokens mask
+        cur_p->size = keep_tokens;
+
+        *pity = 0.0f; // Reset sampler prob pity upon activation
+        *hit = *hit + 1; // Increase sampler hit counter
+
+        // Calculate new top tokens trimming prob and prob difference
+        float new_top = *cur_top - p_lr;
+        float diff = p_lr;
+        if (new_top < 0.0f) { // If new prob ends up being less than 0, calculate new difference and set prob to 0
+            diff = new_top + p_lr;
+            new_top = 0.0f;
+        }
+
+        *cur_top = new_top; // Apply new top token trimming prob
+
+        // Distribute prob difference across other token trimming probs using their default weight
+        *cur_mid = *cur_mid + (diff * (p_mid * (1.0f / (p_mid + p_bot))));
+        *cur_bot = *cur_bot + (diff * (p_bot * (1.0f / (p_mid + p_bot))));
+    }
+    else if (roll2 <= r_bot) { // Trim down to n bottom tokens
+
+        std::vector<llama_token_data> pity_tokens;
+
+        // Calculate value for bottom tokens mask using trim ratio
+        size_t keep_tokens = static_cast<size_t>(
+            round(static_cast<float>(cur_p->size) * (1.0f - p_ratio) )
+        );
+
+        // Prevent removing all tokens
+        if ( keep_tokens == 0 ) { keep_tokens = 1; }
+
+        // Grab bottom tokens by starting at an index that's distribution size minus mask size
+        for ( size_t i = (cur_p->size - keep_tokens); i < cur_p->size; ++i) {
+            pity_tokens.push_back(cur_p->data[i]);
+        }
+
+        // Push bottom tokens to front of distribution and trim distribution up to bottom tokens
+        std::copy(pity_tokens.begin(), pity_tokens.end(), cur_p->data);
+        cur_p->size = pity_tokens.size();
+
+        *pity = 0.0f; // Reset sampler prob pity upon activation
+        *hit = *hit + 1; // Increase sampler hit counter
+
+        // Calculate new bottom tokens trimming prob and prob difference
+        float new_bot = *cur_bot - p_lr;
+        float diff = p_lr;
+        if (new_bot < 0.0f) { // If new prob ends up being less than 0, calculate new difference and set prob to 0
+            diff = new_bot + p_lr;
+            new_bot = 0.0f;
+        }
+
+        *cur_bot = new_bot; // Apply new bottom token trimming prob
+
+        // Distribute prob difference across other token trimming probs using their default weight
+        *cur_top = *cur_top + (diff * (p_top * (1.0f / (p_top + p_mid))));
+        *cur_mid = *cur_mid + (diff * (p_mid * (1.0f / (p_top + p_mid))));
+        
+    }
+    else { // Trim to n middle tokens
+
+        if (cur_p->size <= 2) { // If not enough tokens, increase sampler prob instead
+
+            *pity = *pity + (p_lr/2.0f);
+        }
+        else {
+
+            std::vector<llama_token_data> pity_tokens;
+
+            size_t del_tokens = static_cast<size_t>(floor(
+                (round(static_cast<float>(cur_p->size) * p_ratio))/2.0f
+            ));
+
+            if (cur_p->size % 2 == 0) {
+
+                if ((del_tokens * 2) >= cur_p->size) {
+
+                    del_tokens = (cur_p->size - 2)/2;
+                }
+            } else {
+
+                if ((del_tokens * 2) >= cur_p->size) {
+
+                    del_tokens = (cur_p->size - 1)/2;
+                }
+            }
+
+            for (size_t i = del_tokens; i < (cur_p->size - del_tokens); ++i) {
+                pity_tokens.push_back(cur_p->data[i]);
+            };
+
+            std::copy(pity_tokens.begin(), pity_tokens.end(), cur_p->data);
+            cur_p->size = pity_tokens.size();
+
+            *pity = 0.0f; // Reset sampler prob pity upon activation
+            *hit = *hit + 1; // Increase sampler hit counter
+
+            // Calculate new middle tokens trimming prob and prob difference
+            float new_mid = *cur_mid - p_lr;
+            float diff = p_lr;
+            if (new_mid < 0.0f) { // If new prob ends up being less than 0, calculate new difference and set prob to 0
+                diff = new_mid + p_lr;
+                new_mid = 0.0f;
+            }
+
+            *cur_bot = new_mid; // Apply new middle token trimming prob
+
+            // Distribute prob difference across other token trimming probs using their default weight
+            *cur_top = *cur_top + (diff * (p_top * (1.0f / (p_top + p_bot))));
+            *cur_bot = *cur_bot + (diff * (p_bot * (1.0f / (p_top + p_bot))));
+        }
+    }
+
+    if (*hit == p_reset) {
+        *hit = 0;
+
+        *cur_top = p_top * (1.0f / (p_top + p_mid + p_bot));
+        *cur_mid = p_mid * (1.0f / (p_top + p_mid + p_bot));
+        *cur_bot = p_bot * (1.0f / (p_top + p_mid + p_bot));
+    }
+}
+
 void sample_dry(int n_ctx, int penalty_range, float penalty_multiplier, float penalty_base, int allowed_length, const std::unordered_multimap<gpt_vocab::id, std::vector<gpt_vocab::id>>& restart_sequences, llama_token_data_array * candidates) {
     if (penalty_multiplier <= 0.0f || penalty_base <= 0.0f) {
         return;
@@ -1693,7 +1859,7 @@ bool sample_smooth_idx(const std::vector<samplers> & sampler_order, const sample
 }
 
 int SampleLogits(const float * logits, int n_ctx, int n_vocab, int rep_pen_range, float rep_pen, float rep_pen_slope, float presence_penalty, float top_k, float top_a, float top_p, float min_p, float typical_p, float tfs, float nsigma, float top_h, float temp, std::mt19937 & rng,
-int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability,
+int mirostat, float mirostat_tau, float mirostat_eta, float dry_multiplier, float dry_base, int dry_allowed_length, int dry_penalty_last_n, float xtc_threshold, float xtc_probability, float p_eta, float p_prob, int p_reset, float p_top, float p_mid, float p_bottom, float p_ratio,
 const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dynatemp_range, float dynatemp_exponent, float smoothing_factor)
 {
     // printf("SampleLogits called with: n_ctx=%d, n_vocab=%d, rep_pen_range=%d, rep_pen=%f, rep_pen_slope=%f, presence_penalty=%f, top_k=%f, top_a=%f, top_p=%f, min_p=%f, typical_p=%f, tfs=%f, nsigma=%f, temp=%f, mirostat=%d, mirostat_tau=%f, mirostat_eta=%f, dry_multiplier=%f, dry_base=%f, dry_allowed_length=%d, dry_penalty_last_n=%d, xtc_threshold=%f, xtc_probability=%f, sampler_order_size=%zu, dynatemp_range=%f, dynatemp_exponent=%f, smoothing_factor=%f\n",
@@ -1795,6 +1961,15 @@ const std::vector<samplers> & sampler_order, llama_grammar * grammar, float dyna
     {
         //xtc always last
         sample_xtc(&candidates_p, xtc_threshold, xtc_probability, rng);
+
+        static int cur_hit = 0;
+        static float cur_top = 0.50f * (1.0f / (0.50f + 0.25f + 0.75f));
+        static float cur_mid = 0.25f * (1.0f / (0.50f + 0.25f + 0.75f));
+        static float cur_bot = 0.75f * (1.0f / (0.50f + 0.25f + 0.75f));
+        static float pity = 0.0f;
+        sample_pity(&candidates_p, p_eta, p_prob, p_reset, p_top, p_mid, p_bottom, p_ratio, rng, &cur_top, &cur_mid, &cur_bot, &pity, &cur_hit);
+        
+        
         id = sample_token(&candidates_p, rng);
     }
 
@@ -3478,6 +3653,13 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     kcpp_data->dry_penalty_last_n = inputs.dry_penalty_last_n;
     kcpp_data->xtc_threshold = inputs.xtc_threshold;
     kcpp_data->xtc_probability = inputs.xtc_probability;
+    kcpp_data->pity_eta = inputs.pity_eta;
+    kcpp_data->pity_probability = inputs.pity_probability;
+    kcpp_data->pity_reset = inputs.pity_reset;
+    kcpp_data->pity_top = inputs.pity_top;
+    kcpp_data->pity_middle = inputs.pity_middle;
+    kcpp_data->pity_bottom = inputs.pity_bottom;
+    kcpp_data->pity_ratio = inputs.pity_ratio;
     kcpp_data->dynatemp_range = inputs.dynatemp_range;
     kcpp_data->dynatemp_exponent = inputs.dynatemp_exponent;
     kcpp_data->n_ctx = inputs.max_context_length;
@@ -4264,6 +4446,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                 kcpp_data->dry_multiplier, kcpp_data->dry_base,
                 kcpp_data->dry_allowed_length, kcpp_data->dry_penalty_last_n,
                 kcpp_data->xtc_threshold, kcpp_data->xtc_probability,
+                kcpp_data->pity_eta, kcpp_data->pity_probability, kcpp_data->pity_reset, kcpp_data->pity_top, kcpp_data->pity_middle, kcpp_data->pity_bottom, kcpp_data->pity_ratio,
                 sampler_order, grammar, dynatemp_range, dynatemp_exponent, smoothing_factor);
 
                 if(draft_used)
